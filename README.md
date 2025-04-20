@@ -2,7 +2,7 @@
 
 # fstoken 
 
-An easy to use filesystem tool enabling capability-based access control to files and directories. 
+An easy to use filesystem tool enabling capability-based access control to files.
 
 ## Motivation
 
@@ -10,8 +10,7 @@ Access control represents a very important, yet challenging, feature of reliable
 
 This is an implementation trial of capability-based access control within regular filesystems. The present application may or may not be expanded or generalized to work with distributed applications and handle different computational objects rather than regular files.
 
-## Features
+## File content encryption and decryption
 
-- [ ] Streamlined CLI tool to call actions; 
-- [ ] Capabilities delegation, revocation and invocation between resource owners and users.
+![encryption-decryption-flow](./.github/enc-dec.gif)
 
