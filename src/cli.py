@@ -1,6 +1,10 @@
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
-from src.management import encrypt, decrypt
+from src.nacl import Crypto, Token
+
+
+def sign_tokenize() -> None:
+    token = Token(bytes(), b"Attack")
 
 
 def call_encrypt_routine(parsed_args: Namespace) -> None:
@@ -14,7 +18,8 @@ def call_encrypt_routine(parsed_args: Namespace) -> None:
         print(f"File {str(file)} not found!")
         exit(1)
 
-    encrypt(file)
+    Crypto.encrypt(file)
+
 
 def call_decrpyt_routine(parsed_args: Namespace) -> None:
     file = parsed_args.file
@@ -32,7 +37,7 @@ def call_decrpyt_routine(parsed_args: Namespace) -> None:
         exit(1)
     key = key.strip()
 
-    decrypt(file, key)
+    Crypto.decrypt(file, key)
 
 
 if __name__ == "__main__":
@@ -49,6 +54,8 @@ if __name__ == "__main__":
         call_encrypt_routine(args)
     elif args.command == "dec":
         call_decrpyt_routine(args)
+    elif args.command == "sign":
+        sign_tokenize()
     else:
         print("Command does not exist")
 
