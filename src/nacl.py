@@ -1,10 +1,24 @@
 from pathlib import Path
+from enum import Enum
 from nacl.signing import SigningKey
 from nacl.secret import SecretBox
+from nacl.public import PrivateKey
 from nacl.utils import random
-from nacl.encodings import Base64Encoder
+from nacl.encoding import Base64Encoder
+
 
 class Crypto:
+    @staticmethod
+    def x25519_keygen(use_b64encoding: bool = False) -> tuple[bytes, bytes]:
+        key = PrivateKey.generate()
+        private = bytes(key)
+        public = bytes(key.public_key)
+
+        if not use_b64encoding:
+            return private, public
+
+        return Base64Encoder.encode(private), Base64Encoder.encode(public)
+
     def encrypt(file_path: Path) -> None:
         key = random(SecretBox.KEY_SIZE)
 
@@ -25,7 +39,6 @@ class Crypto:
 
         print("Encryption sucessfully finished! ")
 
-
     def decrypt(file_path: Path, key: str) -> None:
         decoded_key = Base64Encoder.decode(key)
 
@@ -39,7 +52,6 @@ class Crypto:
             file.write(decrypted)
 
         print("Decryption sucessfully finished! ")
-
 
 
 class Token:
