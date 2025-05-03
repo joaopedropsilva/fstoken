@@ -1,7 +1,6 @@
 from os import environ
 from pathlib import Path
 from base64 import b64decode
-from .nacl import Crypto
 
 
 class Fskeys:
@@ -33,7 +32,7 @@ class Fskeys:
 
         if should_keygen:
             cls._log("Generating keys", verbose)
-            (private, public) = Crypto.x25519_keygen(use_b64encoding=True)
+            (private, public) = NaclBinder.x25519_keygen(use_b64encoding=True)
 
             prv_path = Path(fskeys_path, f"{cls._KEYNAME}.prv")
             with open(prv_path, "w") as prv_file:

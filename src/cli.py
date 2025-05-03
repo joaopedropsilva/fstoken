@@ -1,7 +1,8 @@
-from argparse import ArgumentParser, Namespace
-from pathlib import Path
-from src.core import Fskeys
-from src.nacl import Token
+from argparse import ArgumentParser
+
+from .core import Fskeys
+from .token import Token
+
 
 def _require_init_before_exec() -> None:
     check_result = Fskeys.check_dir_and_contents()
@@ -11,8 +12,10 @@ def _require_init_before_exec() -> None:
               "with fstoken init before usage!")
         exit(1)
 
+
 def init() -> None:
     Fskeys.init(verbose=True)
+
 
 def tokenize(file: str, extra: str) -> None:
     _require_init_before_exec()
@@ -32,12 +35,13 @@ def tokenize(file: str, extra: str) -> None:
         input("Grant access of [READ | READ/WRITE]: ").strip().lower()
 
     (private, public) = Fskeys.get_keys()
-    token = Token(iss_seed=private,
-                  subject=subject,
-                  payload={"file": file, "grant": grant, "extra": extra_data})
+    token = Token.encode(private, payload={"file": file,
+                                           "grant": grant,
+                                           "to": subject,
+                                           "extra": extra_data})
 
     print("Token generated:")
-    print(f"{token.encode()}")
+    print(f"{token}")
 
 
 def decode(token: str) -> None:
