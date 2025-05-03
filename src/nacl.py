@@ -1,6 +1,7 @@
 from pathlib import Path
 from enum import Enum
-from nacl.signing import SigningKey
+from pickle import dumps, loads
+from nacl.signing import SigningKey, VerifyKey
 from nacl.secret import SecretBox
 from nacl.public import PrivateKey
 from nacl.utils import random
@@ -59,16 +60,31 @@ class Token:
     def get_utf8_str_from_b64(data: bytes) -> str:
         return Base64Encoder.encode(data).decode("utf-8")
 
-    def __init__(self, iss_public_key: bytes, payload: bytes):
-        self._signing_key = SigningKey(iss_public_key)
+    @staticmethod
+    def _build_payload(payload: dict, encrypt_payload: bool) -> bytes:
+        as_bytes = dumps(payload)
+
+        if not encrypt_payload:
+            return as_bytes
+
+        # implement encryption here
+        return as_bytes
+
+    def __init__(self,
+                 iss_seed: bytes,
+                 subject: str,
+                 payload: dict,
+                 encrypt_payload: bool = False):
+        self._signing_key = SigningKey(iss_seed)
         self._verify_key = self._signing_key.verify_key
-        self._payload = payload
+        self._subject = subject
+        self._payload = self._build_payload(payload, encrypt_payload)
 
     def _sign(self) -> tuple[bytes, bytes]:
         signed_payload = self._signing_key.sign(self._payload)
         return signed_payload.message, signed_payload.signature
 
-    def build(self) -> str:
+    def encode(self) -> str:
         (message, sig) = self._sign()
 
         public_key = self.get_utf8_str_from_b64(bytes(self._verify_key))
@@ -76,4 +92,20 @@ class Token:
         signature = self.get_utf8_str_from_b64(sig)
 
         return f"{public_key}.{payload}.{signature}"
+
+    @staticmethod
+    def decode(token: str):
+        parts = token.split(".")
+        if len(parts) != 3:
+            return ""
+
+        public_key = Base64Encoder.decode(parts[0])
+        payload = Base64Encoder.decode(parts[1])
+        signature = Base64Encoder.decode(parts[2])
+
+        verify_key = VerifyKey(public_key)
+        # implement try catch here
+        _ = verify_key.verify(payload, signature)
+
+        return public_key, loads(payload), signature
 
