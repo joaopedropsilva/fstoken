@@ -14,7 +14,7 @@ class Token:
     _payload_fields = [
         ("file_designator", str),
         ("subject", str),
-        ("proof", list[str])
+        ("proof", list)
     ]
 
     @staticmethod
