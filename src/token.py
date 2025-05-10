@@ -1,7 +1,7 @@
 from pickle import dumps, loads
 from base64 import b64encode, b64decode
 
-from .nacl import NaclBinder
+from src.nacl import NaclBinder
 
 
 class Token:
@@ -11,6 +11,11 @@ class Token:
 
     All token parts are encoded in Base64 by default.
     """
+    _payload_fields = [
+        ("file_designator", str),
+        ("subject", str),
+        ("proof", list[str])
+    ]
 
     @staticmethod
     def _encode_b64_utf8(data: bytes) -> str:
@@ -26,7 +31,19 @@ class Token:
         return loads(data)
 
     @classmethod
+    def _validate_payload(cls, payload: dict) -> None:
+        for required_field, field_type in cls._payload_fields:
+            field_value = payload.get(required_field)
+            if field_value is None:
+                raise KeyError(f"Missing \"{required_field}\" field in payload")
+
+            assert not isinstance(field_value, field_type), \
+                    "Invalid type for payload field"
+
+    @classmethod
     def encode(cls, seed: bytes, payload: dict) -> str:
+        cls._validate_payload(payload)
+
         processed_payload = cls._to_bytes(payload)
         (public_key, message, sig) = NaclBinder.sign_message(seed,
                                                              processed_payload)
