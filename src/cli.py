@@ -23,10 +23,6 @@ def tokenize(file: str, extra: str) -> None:
     if file == "":
         print("A file must be passed to generate a token!")
         exit(1)
-    from json import load
-    extra_data = {}
-    if extra != "":
-        extra_data = load(extra)
 
     subject = \
         input("Delegate access to: ").strip().lower()
@@ -60,13 +56,12 @@ if __name__ == "__main__":
     parser.add_argument("command")
     parser.add_argument("token", nargs="?", default="")
     parser.add_argument("--file", "-f", default="")
-    parser.add_argument("--extra", "-e", default="")
     args = parser.parse_args()
 
     if args.command == "init":
         init()
     elif args.command == "tokenize":
-        tokenize(args.file, args.extra)
+        tokenize(args.file)
     elif args.command == "decode":
         decode(args.token)
     else:
