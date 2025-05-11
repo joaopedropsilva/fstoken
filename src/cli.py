@@ -24,9 +24,11 @@ def tokenize(file: str, extra: str) -> None:
         print("A file must be passed to generate a token!")
         exit(1)
 
+    file _key = ""
+
+    # Retrieve from cli
     subject = \
         input("Delegate access to: ").strip().lower()
-
     grant = \
         input("Grant access of [READ | READ/WRITE]: ").strip().lower()
 

@@ -2,6 +2,7 @@ from nacl.signing import SigningKey, VerifyKey
 from nacl.public import PrivateKey
 from nacl.encoding import Base64Encoder
 from nacl.exceptions import BadSignatureError
+from nacl.hash import sha256
 
 
 class NaclBinder:
@@ -28,12 +29,15 @@ class NaclBinder:
     @staticmethod
     def verify_message(public_key: bytes,
                        message: bytes,
-                       signature: bytes) -> bool:
+                       signature: bytes) -> None:
         verifier = VerifyKey(public_key)
-        try:
-            verifier.verify(message, signature)
-        except BadSignatureError:
-            return False
-        
-        return True
+        verifier.verify(message, signature)
+
+    @staticmethod
+    def sha256_hash(message: bytes, use_b64encoding: bool = False) -> bytes:
+        hashed = sha256(message)
+        if not use_b64encoding:
+            return hashed
+
+        return Base64Encoder.encode(hashed)
 

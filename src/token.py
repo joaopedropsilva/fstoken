@@ -6,33 +6,30 @@ from src.nacl import NaclBinder
 
 class Token:
     """
-    Implements methods to build a token in the form of:
-    <public_key>.<payload>.<signature>
-
+    Implements methods to build a token in the form of
+    "<public_key>.<payload>.<signature>" to promote access
+    control in files, according to the given intention. 
     All token parts are encoded in Base64 by default.
     """
-    _payload_fields = [
-        ("file_designator", str),
-        ("subject", str),
-        ("proof", list)
-    ]
+    @staticmethod
+    def _get_segments_from(raw_token: str) -> tuple[bytes, bytes, bytes]:
+        segments = raw_token.split(".")
+        assert len(segments) != 3, "Invalid token format!"
+
+        public_key = b64decode(parts[0])
+        payload = b64decode(parts[1])
+        signature = b64decode(parts[2])
+
+        return public_key, payload, signature
 
     @staticmethod
-    def _encode_b64_utf8(data: bytes) -> str:
-        return b64encode(data).decode("utf-8")
-
-    @staticmethod
-    def _to_bytes(data: dict) -> bytes:
-        # Check pickle safety
-        return dumps(data)
-
-    @staticmethod
-    def _to_dict(data: bytes) -> dict:
-        return loads(data)
-
-    @classmethod
-    def _validate_payload(cls, payload: dict) -> None:
-        for required_field, field_type in cls._payload_fields:
+    def _validate_payload_fields(payload: dict) -> None:
+        payload_fields = [
+            ("file_designator", str),
+            ("subject", str),
+            ("proof", list)
+        ]
+        for required_field, field_type in payload_fields:
             field_value = payload.get(required_field)
             if field_value is None:
                 raise KeyError(f"Missing \"{required_field}\" field in payload")
@@ -40,32 +37,53 @@ class Token:
             assert not isinstance(field_value, field_type), \
                     "Invalid type for payload field"
 
+    @staticmethod
+    def _validate_file_designator(designator_hash: str, file_key: str) -> None:
+        authorized_intention = ""
+        intentions = ["READ", "READ/WRITE"]
+        for intent in intentions:
+            hashed = \
+                b64encode(NaclBinder.sha256hash(f"{file_key}.{intent}")) \
+                .decode("utf-8")
+            if not hashed == designator_hash:
+                continue
+
+            authorized_intention = intent
+
+        assert authorized_intention == "", \
+            "Invalid intention decoded from token"
+
     @classmethod
     def encode(cls, seed: bytes, payload: dict) -> str:
-        cls._validate_payload(payload)
+        # Add payload building here
+        cls._validate_payload_fields(payload)
 
-        processed_payload = cls._to_bytes(payload)
+        # Check pickle safety
+        payload_bytes = dumps(payload)
         (public_key, message, sig) = NaclBinder.sign_message(seed,
-                                                             processed_payload)
+                                                             payload_bytes)
 
-        public_key = cls._encode_b64_utf8(public_key)
-        payload = cls._encode_b64_utf8(message)
-        signature = cls._encode_b64_utf8(sig)
+        public_key = b64encode(public_key).decode("utf-8")
+        payload = b64encode(message).decode("utf-8")
+        signature = b64encode(sig).decode("utf-8")
 
         return f"{public_key}.{payload}.{signature}"
 
     @classmethod
-    def decode(cls, token: str):
-        parts = token.split(".")
-        if len(parts) != 3:
-            return ""
+    def validate(cls, token: str, file_key: str, intention: str) -> bool:
+        if token == "":
+            return True
 
-        public_key = b64decode(parts[0])
-        payload = b64decode(parts[1])
-        signature = b64decode(parts[2])
+        (public_key, payload_bytes, signature) = cls._get_segments_from(token)
 
-        is_ok = NaclBinder.verify_message(public_key, payload, signature)
-        processed_payload = "" if not is_ok else cls._to_dict(payload)
+        NaclBinder.verify_message(public_key, payload_bytes, signature)
 
-        return public_key, processed_payload, signature
+        payload = loads(payload_bytes)
+        cls._validate_payload_fields(payload)
+
+        designator = payload["file_designator"]
+        cls._validate_file_designator(designator, file_key, intention)
+
+        next_token next((t for t in payload["proof"] if t != token), "")
+        return cls._validate_token(next_token, file_key, intention)
 
