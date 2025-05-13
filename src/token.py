@@ -1,3 +1,5 @@
+from base64 import b64encode, b64decode
+from pickle import dumps, loads
 
 from src.nacl import NaclBinder
 
