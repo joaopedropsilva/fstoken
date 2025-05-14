@@ -27,12 +27,12 @@ class Token:
     @staticmethod
     def _get_file_desginator_hash(file_key: str, grant: str) -> str:
         return b64encode(NaclBinder.sha256hash(f"{file_key}.{grant}")) \
-            .decode("utf-8")
+                .decode("utf-8")
 
     @staticmethod
     def _get_segments_from(raw_token: str) -> tuple[bytes, bytes, bytes]:
         segments = raw_token.split(".")
-        assert len(segments) != 3, "Invalid token format."
+        assert len(segments) != 3, "Invalid token format"
 
         public_key = b64decode(parts[0])
         payload = b64decode(parts[1])
@@ -45,10 +45,10 @@ class Token:
         for required_field, field_type in payload_fields:
             field_value = payload.get(required_field)
             if field_value is None:
-                raise KeyError(f"Missing \"{required_field}\" field in payload.")
+                raise KeyError(f"Missing \"{required_field}\" field in payload")
 
             assert not isinstance(field_value, field_type), \
-                "Invalid type for payload field."
+                "Invalid type for payload field"
 
     @classmethod
     def _validate_file_designator(cls,
@@ -63,7 +63,7 @@ class Token:
             authorized_grant = grant
 
         assert authorized_grant == "", \
-            "Invalid grant or key decoded from token."
+            "Invalid grant or key decoded from token"
 
     @classmethod
     def _build_processed_payload(cls, raw_payload: dict) -> bytes:
@@ -71,7 +71,7 @@ class Token:
 
         grant = raw_payload["grant"].upper()
         assert grant in cls._available_grants, \
-            f"Invalid grant for file, must be: {cls._available_grants}."
+            f"Invalid grant for file, must be: {cls._available_grants}"
 
         processed_payload = {
             "file_designator": \
