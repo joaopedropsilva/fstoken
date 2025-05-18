@@ -3,6 +3,8 @@ from nacl.public import PrivateKey
 from nacl.encoding import Base64Encoder
 from nacl.exceptions import BadSignatureError
 from nacl.hash import sha256
+from nacl.secret import SecretBox
+from nacl.utils import random
 
 
 class NaclBinder:
@@ -40,4 +42,22 @@ class NaclBinder:
             return hashed
 
         return Base64Encoder.encode(hashed)
+
+    @staticmethod
+    def secretbox_keygen(use_b64encoding: bool = False) -> bytes:
+        key = random(SecretBox.KEY_SIZE)
+        if not use_b64encoding:
+            return key
+
+        return Base64Encoder.encode(key)
+
+    @staticmethod
+    def secretbox_encrypt(file_content: bytes, key: bytes) -> bytes:
+        box = SecretBox(key)
+        return box.encrypt(file_content)
+
+    @staticmethod
+    def secretbox_decrypt(encrypted: bytes, key: bytes) -> bytes:
+        box = SecretBox(key)
+        return box.decrypt(file_content)
 
