@@ -52,12 +52,12 @@ class NaclBinder:
         return Base64Encoder.encode(key)
 
     @staticmethod
-    def secretbox_encrypt(file_content: bytes, key: bytes) -> bytes:
+    def secretbox_encrypt(key: bytes, raw: bytes) -> bytes:
         box = SecretBox(key)
-        return box.encrypt(file_content)
+        return box.encrypt(raw)
 
     @staticmethod
-    def secretbox_decrypt(encrypted: bytes, key: bytes) -> bytes:
+    def secretbox_decrypt(key: bytes, encrypted: bytes) -> bytes:
         box = SecretBox(key)
-        return box.decrypt(file_content)
+        return box.decrypt(encrypted)
 

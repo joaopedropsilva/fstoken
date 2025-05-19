@@ -22,8 +22,9 @@ def add(filestring: str, should_encrypt: bool) -> None:
     filepath = Path(filestring)
     assert filepath.exists(), "The file must exist to use this command"
 
-    file_key_exist = Keystore.check_entry_existence(Fskeys.DIRPATH, filepath)
-    if file_key_exist:
+    (file, _, _) = \
+            Keystore.check_entry(Fskeys.DIRPATH, filepath)
+    if file != "":
         print("File already exists in keystore")
         return
 
@@ -33,6 +34,24 @@ def add(filestring: str, should_encrypt: bool) -> None:
 
     entry_data = (filepath, should_encrypt, filekey)
     Keystore.create_entry(Fskeys.DIRPATH, entry_data)
+
+
+def remove(filestring: str) -> None:
+    _require_init_before_exec()
+
+    assert filestring != "", "A file must be passed to use this command"
+
+    filepath = Path(filestring)
+    (file, is_encrypted, filekey) = \
+            Keystore.check_entry(Fskeys.DIRPATH, filepath)
+    if file == "":
+        print("File not found in keystore")
+        return
+
+    if is_encrypted:
+        File.decrypt(filepath, filekey)
+
+    Keystore.remove_entry(Fskeys.DIRPATH, filepath)
 
 
 def tokenize(file: str, extra: str) -> None:
@@ -59,7 +78,7 @@ def tokenize(file: str, extra: str) -> None:
 
 
 if __name__ == "__main__":
-    parser = ArgumentParser(prog="fsktoken",
+    parser = ArgumentParser(prog="fstoken",
                             description="A command line tool that enables " \
                             "file access control using a semi capabilities " \
                             "model and encryption.")
@@ -75,7 +94,7 @@ if __name__ == "__main__":
     elif args.command == "add":
         add(args.file, args.encrypt)
     elif args.command == "remove":
-        pass
+        remove(args.file)
     elif args.command == "delegate":
         tokenize(args.file)
     elif args.command == "invoke":
