@@ -1,9 +1,9 @@
 from argparse import ArgumentParser
 from pathlib import Path
 
-from src.fskeys import Fskeys
+from src.fskeys import Fskeys, Keystore
 from src.token import Token
-from src.file import Keystore, File
+from src.file import File
 
 
 def _require_init_before_exec() -> None:
@@ -23,7 +23,7 @@ def add(filestring: str, should_encrypt: bool) -> None:
     assert filepath.exists(), "The file must exist to use this command"
 
     (file, _, _) = \
-            Keystore.check_entry(Fskeys.DIRPATH, filepath)
+            Keystore.search_entry(Fskeys.DIRPATH, filepath)
     if file != "":
         print("File already exists in keystore")
         return
@@ -43,7 +43,7 @@ def remove(filestring: str) -> None:
 
     filepath = Path(filestring)
     (file, is_encrypted, filekey) = \
-            Keystore.check_entry(Fskeys.DIRPATH, filepath)
+            Keystore.search_entry(Fskeys.DIRPATH, filepath)
     if file == "":
         print("File not found in keystore")
         return
