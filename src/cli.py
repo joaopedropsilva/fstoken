@@ -1,4 +1,4 @@
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from pathlib import Path
 
 from src.fskeys import Fskeys, Keystore
@@ -14,67 +14,54 @@ def init() -> None:
     Fskeys.init(verbose=True)
 
 
-def add(filestring: str, should_encrypt: bool) -> None:
+def add_or_delegate(args: Namespace) -> None:
     _require_init_before_exec()
 
-    assert filestring != "", "A file must be passed to use this command"
+    # validate if file belongs to user
+    if args.file == "":
+        print("A file must be passed to use this command")
 
-    filepath = Path(filestring)
-    assert filepath.exists(), "The file must exist to use this command"
+    (filepath, _, key) = Keystore.add(args.file, args.encrypt)
 
-    (file, _, _) = \
-            Keystore.search_entry(Fskeys.DIRPATH, filepath)
-    if file != "":
-        print("File already exists in keystore")
+    if args.encrypt:
+        File.encrypt(filepath, key)
+    else:
+        pass
+        # File was just added with args.encrypt 0 will break here
+        # there is a need to clarify intention to run this operation
+        # according to what happened before
+        #File.decrypt(filepath, key)
+
+    if args.grant == "" or args.subject == "":
         return
 
-    filekey = File.create_key()
-    if should_encrypt:
-        File.encrypt(filepath, filekey)
-
-    entry_data = (filepath, should_encrypt, filekey)
-    Keystore.create_entry(Fskeys.DIRPATH, entry_data)
+    (private, _) = Fskeys.get_keys()
+    token = Token.encode(private, raw_payload={"file_key": key.decode("utf-8"),
+                                               "grant": args.grant,
+                                               "subject": args.subject,
+                                               "proof": [args.token]})
+    print(token)
 
 
 def remove(filestring: str) -> None:
     _require_init_before_exec()
 
-    assert filestring != "", "A file must be passed to use this command"
+    if filestring == "":
+        print("A file must be passed to use this command")
 
-    filepath = Path(filestring)
-    (file, is_encrypted, filekey) = \
-            Keystore.search_entry(Fskeys.DIRPATH, filepath)
-    if file == "":
-        print("File not found in keystore")
-        return
-
-    if is_encrypted:
-        File.decrypt(filepath, filekey)
-
-    Keystore.remove_entry(Fskeys.DIRPATH, filepath)
+    (_, was_encrypted, key) = Keystore.update_or_remove_entry(filestring)
+    if was_encrypted:
+        File.decrypt(filestring, key)
 
 
-def tokenize(file: str, extra: str) -> None:
-    _require_init_before_exec()
+def invoke(filestring: str, token: str) -> None:
+    # Token eval
+    pass
 
-    # get file_key based on ownership
-    # sugest file encryption
-    file_key = ""
-    # Retrieve from cli
-    subject = \
-        input("Delegate access to: ").strip().upper()
-    grant = \
-        input("Grant access of [READ | READ/WRITE]: ").strip().upper()
-    delegated_token = ""
 
-    (private, public) = Fskeys.get_keys()
-    token = Token.encode(private, raw_payload={"file_key": file,
-                                               "grant": grant,
-                                               "subject": subject,
-                                               "proof": [delegated_token]})
-
-    print("Token generated:")
-    print(f"{token}")
+def revoke(filestring: str) -> None:
+    # Key rotate
+    pass
 
 
 if __name__ == "__main__":
@@ -83,24 +70,23 @@ if __name__ == "__main__":
                             "file access control using a semi capabilities " \
                             "model and encryption.")
     parser.add_argument("command")
-    parser.add_argument("file", nargs="?", default="")
-    parser.add_argument("grant", nargs="?", default="READ")
-    parser.add_argument("token", nargs="?", default="")
+    parser.add_argument("--file", "-f", default="")
+    parser.add_argument("--grant", "-g", default="READ")
+    parser.add_argument("--subject", "-s", default="")
+    parser.add_argument("--token", "-t", default="")
     parser.add_argument("--encrypt", "-e", action="store_true")
     args = parser.parse_args()
 
     if args.command == "init":
         init()
-    elif args.command == "add":
-        add(args.file, args.encrypt)
+    elif args.command == "delegate":
+        add_or_delegate(args)
     elif args.command == "remove":
         remove(args.file)
-    elif args.command == "delegate":
-        tokenize(args.file)
     elif args.command == "invoke":
-        decode(args.token)
+        invoke(args.token)
     elif args.command == "revoke":
-        pass
+        revoke(args.file)
     else:
         print("Command does not exist")
 
