@@ -9,7 +9,7 @@ from src.helpers import log
 
 def _handle_deletion(args: Namespace,
                      was_encrypted: bool,
-                     prev_key: str) -> None:
+                     filekey: str) -> None:
     if prev_key == "":
         log(f"File not found in {Keystore.STORE_FILENAME}", args.verbose)
         exit(1)
@@ -18,49 +18,69 @@ def _handle_deletion(args: Namespace,
     Keystore.change_entry(args.file, delete=True)
 
     if was_encrypted:
-        if not File.decrypt(args.file, prev_key):
+        if not File.decrypt(args.file, filekey):
             exit(1)
 
     exit(0)
 
 
-def _handle_invocation(args: Namespace) -> None:
-    pass
+def _handle_invocation(args: Namespace,
+                       was_encrypted: bool,
+                       filekey: str) -> None:
+    try:
+        validity = Token.validate(args.token, filekey)
+        print(f"valid: {validity}")
+    except (AssertionError, KeyError) as err:
+        log(err, verbose=True)
+        exit(1)
+
+    exit(0)
+
+
+def _handle_delegation(args: Namespace, filekey: str) -> None:
+    (private, _) = Fskeys.get_keys()
+    try:
+        token = Token.encode(private, raw_payload={"filekey": filekey,
+                                                   "grant": args.grant,
+                                                   "subject": args.subject,
+                                                   "proof": [args.token]})
+    except (AssertionError, KeyError) as err:
+        log(err, verbose=True)
+        exit(1)
+
+    print(token)
+
+    exit(0)
 
 
 def handle_call(args: Namespace) -> None:
     Fskeys.init(verbose=args.verbose)
 
-    (was_encrypted, prev_key) = Keystore.search_entry_state(args.file)
+    (was_encrypted, prevkey) = Keystore.search_entry_state(args.file)
 
     is_deletion = args.delete
-    is_delegation = args.token and args.grant and args.subject
+    is_delegation = args.grant and args.subject
     is_invocation = args.token and not is_delegation
 
     if is_deletion:
-        _handle_deletion(args, was_encrypted, prev_key)
+        _handle_deletion(args, was_encrypted, prevkey)
     if is_invocation:
-        _handle_invocation(args)
+        _handle_invocation(args, was_encrypted, prevkey)
 
-    filekey = Keystore.change_entry(args.file,
-                                    encrypt=args.encrypt,
-                                    rotate_key=args.rotate,
-                                    delete=False)
+    newkey = Keystore.change_entry(args.file,
+                                   encrypt=args.encrypt,
+                                   rotate_key=args.rotate,
+                                   delete=False)
 
     if was_encrypted:
-        if not File.decrypt(args.file, prev_key):
+        if not File.decrypt(args.file, prevkey):
             exit(1)
     if args.encrypt:
-        if not File.encrypt(args.file, filekey):
+        if not File.encrypt(args.file, newkey):
             exit(1)
 
     if is_delegation:
-        (private, _) = Fskeys.get_keys()
-        token = Token.encode(private, raw_payload={"file_key": filekey,
-                                                   "grant": args.grant,
-                                                   "subject": args.subject,
-                                                   "proof": [args.token]})
-        print(token)
+        _handle_delegation(args, newkey)
 
 
 if __name__ == "__main__":
