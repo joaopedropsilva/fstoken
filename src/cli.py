@@ -4,13 +4,15 @@ from pathlib import Path
 from src.fskeys import Fskeys, Keystore
 from src.token import Token
 from src.file import File
+from src.helpers import log
 
 
 def handle_call(args: Namespace) -> None:
-    Fskeys.init(verbose=True)
+    Fskeys.init(verbose=args.verbose)
 
     (was_encrypted, prev_key) = Keystore.search_entry_state(args.file)
     if args.delete and prev_key == "":
+        log_if_verbose("File not found in keystore", args.verbose)
         return
 
     filekey = Keystore.change_entry(args.file,

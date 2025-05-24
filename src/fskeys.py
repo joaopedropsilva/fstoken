@@ -2,6 +2,7 @@ from os import environ
 from pathlib import Path
 
 from src.nacl import NaclBinder
+from src.helpers import log
 
 
 class Fskeys:
@@ -10,19 +11,14 @@ class Fskeys:
     DIRNAME = ".fskeys"
     DIRPATH = Path(_HOME, DIRNAME)
 
-    @staticmethod
-    def _log_if_verbose(message: str, verbose: bool) -> None:
-        if verbose:
-            print(message)
-
     @classmethod
     def init(cls, verbose: bool = False) -> None:
-        cls._log_if_verbose(f"Checking for {cls.DIRNAME} existence", verbose)
+        log(f"Checking for {cls.DIRNAME} existence", verbose)
         if not cls.DIRPATH.exists():
-            cls._log_if_verbose(f"Creating {cls.DIRNAME}", verbose)
+            log(f"Creating {cls.DIRNAME}", verbose)
             cls.DIRPATH.mkdir(mode=0o700)
  
-        cls._log_if_verbose("Checking for keys existence", verbose)
+        log("Checking for keys existence", verbose)
         should_keygen = False
         for file_ext in ["prv", "pub"]:
             key_file = Path(cls.DIRPATH, f"{cls._KEYNAME}.{file_ext}")
@@ -31,7 +27,7 @@ class Fskeys:
                 key_file.touch(mode=0o600)
 
         if should_keygen:
-            cls._log_if_verbose("Generating keys", verbose)
+            log("Generating keys", verbose)
             (private, public) = NaclBinder.x25519_keygen()
 
             prv_path = Path(cls.DIRPATH, f"{cls._KEYNAME}.prv")
@@ -41,10 +37,10 @@ class Fskeys:
             with open(pub_path, "w") as pub_file:
                 pub_file.write(public.decode("utf-8"))
 
-        cls._log_if_verbose("Checking keystore existence", verbose)
+        log("Checking keystore existence", verbose)
         keystore = Path(cls.DIRPATH, Keystore.STORE_FILENAME)
         if not keystore.exists():
-            cls._log_if_verbose("Creating keystore", verbose)
+            log("Creating keystore", verbose)
             Keystore.create()
 
     @classmethod
