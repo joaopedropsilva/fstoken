@@ -12,7 +12,7 @@ class Token:
     All token parts are encoded in Base64 by default.
     """
     _raw_payload_fields = [
-        ("file_key", str),
+        ("filekey", str),
         ("grant", str),
         ("subject", str),
         ("proof", list)
@@ -25,17 +25,18 @@ class Token:
     _available_grants = ["READ", "READ/WRITE"]
 
     @staticmethod
-    def _get_file_desginator_hash(file_key: str, grant: str) -> str:
-        return NaclBinder.sha256hash(f"{file_key}.{grant}").decode("utf-8")
+    def _get_file_designator_hash(filekey: str, grant: str) -> str:
+        designator = f"{filekey}.{grant}"
+        return NaclBinder.sha256_hash(b"{designator}").decode("utf-8")
 
     @staticmethod
     def _get_segments_from(raw_token: str) -> tuple[bytes, bytes, bytes]:
         segments = raw_token.split(".")
-        assert len(segments) != 3, "Invalid token format"
+        assert len(segments) == 3, "Invalid token format"
 
-        public_key = b64decode(parts[0])
-        payload = b64decode(parts[1])
-        signature = b64decode(parts[2])
+        public_key = b64decode(segments[0])
+        payload = b64decode(segments[1])
+        signature = b64decode(segments[2])
 
         return public_key, payload, signature
 
@@ -46,22 +47,22 @@ class Token:
             if field_value is None:
                 raise KeyError(f"Missing \"{required_field}\" field in payload")
 
-            assert not isinstance(field_value, field_type), \
+            assert isinstance(field_value, field_type), \
                 "Invalid type for payload field"
 
     @classmethod
     def _validate_file_designator(cls,
                                   designator: str,
-                                  file_key: str) -> None:
+                                  filekey: str) -> None:
         authorized_grant = ""
         for grant in cls._available_grants:
-            hashed = cls._get_file_designator_hash(file_key, grant)
+            hashed = cls._get_file_designator_hash(filekey, grant)
             if not hashed == designator:
                 continue
 
             authorized_grant = grant
 
-        assert authorized_grant == "", \
+        assert authorized_grant != "", \
             "Invalid grant or key decoded from token"
 
     @classmethod
@@ -74,7 +75,7 @@ class Token:
 
         processed_payload = {
             "file_designator": \
-                cls._get_file_designator_hash(raw_payload["file_key"],
+                cls._get_file_designator_hash(raw_payload["filekey"],
                                               raw_payload["grant"]),
             "subject": raw_payload["subject"],
             "proof": raw_payload["proof"]
@@ -97,7 +98,7 @@ class Token:
         return f"{public_key}.{payload}.{signature}"
 
     @classmethod
-    def validate(cls, token: str, file_key: str) -> bool:
+    def validate(cls, token: str, filekey: str) -> bool:
         if token == "":
             return True
 
@@ -109,8 +110,8 @@ class Token:
         cls._validate_payload_fields(payload, cls._processed_payload_fields)
 
         designator = payload["file_designator"]
-        cls._validate_file_designator(designator, file_key)
+        cls._validate_file_designator(designator, filekey)
 
         next_token = next((t for t in payload["proof"] if t != token), "")
-        return cls.validate(next_token, file_key)
+        return cls.validate(next_token, filekey)
 
