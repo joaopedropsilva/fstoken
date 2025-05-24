@@ -48,27 +48,6 @@ class Fskeys:
             Keystore.create()
 
     @classmethod
-    def check_dir_and_contents(cls) -> None:
-        assert cls.DIRPATH.exists(), \
-            f"{cls.DIRNAME} does not exist"
-
-        prv_key = Path(cls.DIRPATH, f"{cls._KEYNAME}.prv")
-        pub_key = Path(cls.DIRPATH, f"{cls._KEYNAME}.pub")
-        assert prv_key.exists(), \
-            f"{cls._KEYNAME}.prv does not exist"
-        assert pub_key.exists(), \
-            f"{cls._KEYNAME}.pub does not exist"
-        assert prv_key.stat().st_size != 0, \
-            f"{cls._KEYNAME}.prv is empty"
-        assert pub_key.stat().st_size != 0, \
-            f"{cls._KEYNAME}.pub is empty"
-
-        keystore = Path(cls.DIRPATH, Keystore.STORE_FILENAME)
-        assert keystore.exists(), \
-            f"{Keystore.STORE_FILENAME} does not exist"
-
-
-    @classmethod
     def get_keys(cls) -> tuple[str, str]:
         prv_path = Path(cls.DIRPATH, f"{cls._KEYNAME}.prv")
         try:
