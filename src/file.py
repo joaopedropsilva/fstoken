@@ -2,6 +2,7 @@ from pathlib import Path
 from functools import partial
 
 from src.nacl import NaclBinder
+from src.helpers import log
 
 
 class File:
@@ -16,22 +17,48 @@ class File:
             file.write(reprocessed)
 
     @staticmethod
-    def decrypt_to_read(file: str, b64key: bytes | str) -> bytes:
+    def decrypt_to_read(file: str, b64key: bytes | str) -> str:
         filepath = Path(pathlike)
-        with open(filepath, "rb") as file:
-            encrypted = file.read()
+        try:
+            with open(filepath, "rb") as file:
+                encrypted = file.read()
 
-            return NaclBinder.secretbox_decrypt(encrypted, b64key)
-    
+                return NaclBinder.secretbox_decrypt(encrypted, b64key) \
+                        .decode("utf-8")
+        except PermissionError:
+            log_if_verbose(
+                f"Unable to decrypt: {args.file}, operation not permitted",
+                verbose=True
+            )
+            return ""
+
     @classmethod
-    def encrypt(cls, file: str, b64key: bytes | str) -> None:
+    def encrypt(cls, file: str, b64key: bytes | str) -> bool:
         filepath = Path(file)
         encrypt_fn = partial(NaclBinder.secretbox_encrypt, b64key)
-        cls._rewrite_file(filepath, encrypt_fn)
+        try:
+            cls._rewrite_file(filepath, encrypt_fn)
+        except PermissionError:
+            log_if_verbose(
+                f"Unable to encrypt: {args.file}, operation not permitted",
+                verbose=True
+            )
+            return False
+
+        return True
 
     @classmethod
-    def decrypt(cls, file: str, b64key: bytes | str) -> bytes:
+    def decrypt(cls, file: str, b64key: bytes | str) -> bool:
         filepath = Path(file)
         decrypt_fn = partial(NaclBinder.secretbox_decrypt, b64key)
-        cls._rewrite_file(filepath, decrypt_fn)
+        try:
+            cls._rewrite_file(filepath, decrypt_fn)
+        except PermissionError:
+            log_if_verbose(
+                f"Unable to decrypt: {args.file}, operation not permitted",
+                verbose=True
+            )
+            return False
+
+        return True
 
