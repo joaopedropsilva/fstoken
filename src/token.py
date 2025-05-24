@@ -26,8 +26,7 @@ class Token:
 
     @staticmethod
     def _get_file_desginator_hash(file_key: str, grant: str) -> str:
-        return b64encode(NaclBinder.sha256hash(f"{file_key}.{grant}")) \
-                .decode("utf-8")
+        return NaclBinder.sha256hash(f"{file_key}.{grant}").decode("utf-8")
 
     @staticmethod
     def _get_segments_from(raw_token: str) -> tuple[bytes, bytes, bytes]:
@@ -85,10 +84,10 @@ class Token:
         return dumps(processed_payload)
 
     @classmethod
-    def encode(cls, seed: bytes, raw_payload: dict) -> str:
+    def encode(cls, seed: str, raw_payload: dict) -> str:
         payload_bytes = cls._build_processed_payload(raw_payload)
 
-        (public_key, message, sig) = NaclBinder.sign_message(seed,
+        (public_key, message, sig) = NaclBinder.sign_message(b64decode(seed),
                                                              payload_bytes)
 
         public_key = b64encode(public_key).decode("utf-8")

@@ -1,5 +1,4 @@
 from pathlib import Path
-from base64 import b64decode
 from functools import partial
 
 from src.nacl import NaclBinder
@@ -17,25 +16,22 @@ class File:
             file.write(reprocessed)
 
     @staticmethod
-    def decrypt_to_read(pathlike: Path | str, b64key: bytes | str) -> bytes:
+    def decrypt_to_read(file: str, b64key: bytes | str) -> bytes:
         filepath = Path(pathlike)
-        key = b64decode(b64key)
         with open(filepath, "rb") as file:
             encrypted = file.read()
 
-            return NaclBinder.secretbox_decrypt(encrypted, key)
+            return NaclBinder.secretbox_decrypt(encrypted, b64key)
     
     @classmethod
-    def encrypt(cls, pathlike: Path | str, b64key: bytes | str) -> None:
-        filepath = Path(pathlike)
-        key = b64decode(b64key)
-        encrypt_fn = partial(NaclBinder.secretbox_encrypt, key)
+    def encrypt(cls, file: str, b64key: bytes | str) -> None:
+        filepath = Path(file)
+        encrypt_fn = partial(NaclBinder.secretbox_encrypt, b64key)
         cls._rewrite_file(filepath, encrypt_fn)
 
     @classmethod
-    def decrypt(cls, pathlike: Path | str, b64key: bytes | str) -> bytes:
-        filepath = Path(pathlike)
-        key = b64decode(b64key)
-        decrypt_fn = partial(NaclBinder.secretbox_decrypt, key)
+    def decrypt(cls, file: str, b64key: bytes | str) -> bytes:
+        filepath = Path(file)
+        decrypt_fn = partial(NaclBinder.secretbox_decrypt, b64key)
         cls._rewrite_file(filepath, decrypt_fn)
 

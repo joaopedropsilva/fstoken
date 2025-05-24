@@ -1,6 +1,5 @@
 from os import environ
 from pathlib import Path
-from base64 import b64decode
 
 from src.nacl import NaclBinder
 
@@ -33,7 +32,7 @@ class Fskeys:
 
         if should_keygen:
             cls._log_if_verbose("Generating keys", verbose)
-            (private, public) = NaclBinder.x25519_keygen(use_b64encoding=True)
+            (private, public) = NaclBinder.x25519_keygen()
 
             prv_path = Path(cls.DIRPATH, f"{cls._KEYNAME}.prv")
             with open(prv_path, "w") as prv_file:
@@ -70,21 +69,21 @@ class Fskeys:
 
 
     @classmethod
-    def get_keys(cls) -> tuple[bytes, bytes]:
+    def get_keys(cls) -> tuple[str, str]:
         prv_path = Path(cls.DIRPATH, f"{cls._KEYNAME}.prv")
         try:
             with open(prv_path, "r") as prv_file:
-                prv_content = b64decode(prv_file.readlines()[0].strip())
+                prv_content = prv_file.readlines()[0].strip()
         except Exception:
-            return bytes(), bytes()
+            return "", ""
         private = prv_content
 
         pub_path = Path(cls.DIRPATH, f"{cls._KEYNAME}.prv")
         try:
             with open(pub_path, "r") as pub_file:
-                pub_content = b64decode(pub_file.readlines()[0].strip())
+                pub_content = pub_file.readlines()[0].strip()
         except Exception:
-            return bytes(), bytes()
+            return "", ""
         public = pub_content
 
         return private, public
@@ -95,33 +94,12 @@ class Keystore:
     _ENTRY_DATA_SEP = "\t"
 
     @staticmethod
-    def _get_file_repr(pathlike: Path | str) -> str:
-        filepath = Path(pathlike)
-        return str(filepath.resolve())
+    def _get_filestring(file: str) -> str:
+        return str(Path(file).resolve())
 
     @staticmethod
-    def _create_key() -> bytes:
-        return NaclBinder.secretbox_keygen(use_b64encoding=True)
-
-    @classmethod
-    def _create_entry_repr(cls,
-                           filestring: str,
-                           is_encrypted: bool | str,
-                           key: bytes | str) -> str:
-        file_repr = cls._get_file_repr(filestring)
-        enc_repr = is_encrypted
-        if not isinstance(is_encrypted, str):
-            enc_repr = "1" if is_encrypted else "0"
-        keystring = key
-        if not isinstance(key, str):
-            keystring = key.decode("utf-8")
-
-        return file_repr \
-                + cls._ENTRY_DATA_SEP \
-                + enc_repr \
-                + cls._ENTRY_DATA_SEP \
-                + keystring \
-                + "\n"
+    def _create_key() -> str:
+        return NaclBinder.secretbox_keygen().decode("utf-8")
 
     @classmethod
     def create(cls) -> None:
@@ -129,7 +107,18 @@ class Keystore:
         keystore.touch(mode=0o600)
 
     @classmethod
-    def _search(cls, filestring: str) -> tuple[Path | None, bool, bytes]:
+    def _create_entry_repr(cls, entry: tuple[str, str, str]) -> str:
+        (filestring, encstring, keystring) = entry
+
+        return filestring \
+                + cls._ENTRY_DATA_SEP \
+                + encstring \
+                + cls._ENTRY_DATA_SEP \
+                + keystring \
+                + "\n"
+
+    @classmethod
+    def search_entry_state(cls, file: str) -> tuple[bool, str]:
         keystore = Path(Fskeys.DIRPATH, cls.STORE_FILENAME)
         with open(keystore, "r") as ks:
             entries = list(map(lambda line: line.split(cls._ENTRY_DATA_SEP),
@@ -138,81 +127,70 @@ class Keystore:
             for entry in entries:
                 if len(entry) != 3:
                     continue
-                (file_repr, enc_repr, keystring) = entry
-                if file_repr == cls._get_file_repr(filestring):
-                    is_encrypted = True if enc_repr == "1" else False
-                    return Path(file_repr), is_encrypted, b64decode(keystring)
+                (filestring, encstring, keystring) = entry
+                if filestring == cls._get_filestring(file):
+                    encrypted = True if encstring == "1" else False
+                    return encrypted, keystring
 
-        return None, False, bytes()
+        return False, ""
 
     @classmethod
-    def _append(cls, filestring: str, is_encrypted: bool, key: bytes) -> None:
+    def _append(cls, entry: tuple[str, str, str]) -> None:
         keystore = Path(Fskeys.DIRPATH, cls.STORE_FILENAME)
         with open(keystore, "a") as ks:
-            entry = cls._create_entry_repr(filestring, is_encrypted, key)
-            ks.write(entry)
+            ks.write(cls._create_entry_repr(entry))
 
     @classmethod
-    def update_or_remove_entry(cls,
-                               filestring: str,
-                               new_encryption_state: bool = None,
-                               new_key: bytes = None) -> tuple[str, bool, str]:
+    def _get_all_entries(cls) -> list[tuple[str, str, str]]:
+        all_entries = []
         keystore = Path(Fskeys.DIRPATH, cls.STORE_FILENAME)
-        with open(keystore, "r+") as ks:
+        with open(keystore, "r") as ks:
             entries = list(map(lambda l: l.split(cls._ENTRY_DATA_SEP),
                                ks.readlines()))
 
-            old_entry = None
-            for index, entry in enumerate(entries):
+            for entry in entries:
                 if len(entry) != 3:
                     continue
 
-                (file_repr, _, _) = entry
-                if file_repr == cls._get_file_repr(filestring):
-                    old_entry = entry
-            if old_entry is None:
-                return
+                all_entries.append(entry)
 
-            new_entries = [e for e in entries
-                           if len(e) == 3 and e != old_entry]
-
-            old_entry_updated = None
-            if new_encryption_state is not None:
-                old_entry_updated = cls._create_entry_repr(old_entry[0],
-                                                           new_encryption_state,
-                                                           old_entry[2])
-            elif new_key is not None:
-                old_entry_updated = cls._create_entry_repr(old_entry[0],
-                                                           old_entry[1],
-                                                           new_key)
-
-            if old_entry_updated is not None:
-                new_entries.append(old_entry_updated)
-
-            ks.seek(0)
-            ks.truncate(0)
-            for file_repr, enc_repr, keystring in new_entries:
-                entry = cls._create_entry_repr(file_repr, enc_repr, keystring)
-                ks.write(entry)
-
-            (filestring, enc_repr, keystring) = old_entry_updated
-            return filestring, True if enc_repr == "1" else 0, keystring
+        return all_entries
 
     @classmethod
-    def add(cls,
-            filestring: str,
-            should_encrypt: bool) -> tuple[Path, bool, bytes]:
-        (file_stored, enc_stored, key_stored) = cls._search(filestring)
+    def _truncate_and_rewrite_lines(
+            cls, entries: list[tuple[str, str, str]]) -> None:
+        keystore = Path(Fskeys.DIRPATH, cls.STORE_FILENAME)
+        with open(keystore, "w") as ks:
+            for entry in entries:
+                ks.write(cls._create_entry_repr(entry))
 
-        filekey = cls._create_key() if file_stored is None else key_stored
+    @classmethod
+    def change_entry(cls,
+                     file: str,
+                     encrypt: bool = False,
+                     rotate_key: bool = False,
+                     delete: bool = False) -> str:
+        (_, current_key) = cls.search_entry_state(file)
+        entry_exists = current_key != ""
 
-        if file_stored is None:
-            cls._append(filestring, should_encrypt, filekey)
-            return Path(filestring), should_encrypt, filekey
+        filekey = cls._create_key() \
+                if rotate_key or not entry_exists else current_key
+        new_entry = (cls._get_filestring(file), 
+                     "1" if encrypt else "0",
+                     filekey)
 
-        if should_encrypt != enc_stored:
-            cls.update_or_remove_entry(filestring, should_encrypt)
-            return file_stored, should_encrypt, key_stored
+        if not entry_exists:
+            cls._append(new_entry)
 
-        return file_stored, enc_stored, filekey
+            return filekey
+
+        new_entries = [er for er in cls._get_all_entries() \
+                       if er[0] != new_entry[0]]
+
+        if not delete:
+            new_entries.append(new_entry)
+
+        cls._truncate_and_rewrite_lines(new_entries)
+
+        return filekey
 

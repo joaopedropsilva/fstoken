@@ -9,13 +9,10 @@ from nacl.utils import random
 
 class NaclBinder:
     @staticmethod
-    def x25519_keygen(use_b64encoding: bool = False) -> tuple[bytes, bytes]:
+    def x25519_keygen() -> tuple[bytes, bytes]:
         key = PrivateKey.generate()
         private = bytes(key)
         public = bytes(key.public_key)
-
-        if not use_b64encoding:
-            return private, public
 
         return Base64Encoder.encode(private), Base64Encoder.encode(public)
 
@@ -36,28 +33,22 @@ class NaclBinder:
         verifier.verify(message, signature)
 
     @staticmethod
-    def sha256_hash(message: bytes, use_b64encoding: bool = False) -> bytes:
+    def sha256_hash(message: bytes) -> bytes:
         hashed = sha256(message)
-        if not use_b64encoding:
-            return hashed
-
         return Base64Encoder.encode(hashed)
 
     @staticmethod
-    def secretbox_keygen(use_b64encoding: bool = False) -> bytes:
+    def secretbox_keygen() -> bytes:
         key = random(SecretBox.KEY_SIZE)
-        if not use_b64encoding:
-            return key
-
         return Base64Encoder.encode(key)
 
     @staticmethod
-    def secretbox_encrypt(key: bytes, raw: bytes) -> bytes:
-        box = SecretBox(key)
+    def secretbox_encrypt(b64key: bytes, raw: bytes) -> bytes:
+        box = SecretBox(b64key, encoder=Base64Encoder)
         return box.encrypt(raw)
 
     @staticmethod
-    def secretbox_decrypt(key: bytes, encrypted: bytes) -> bytes:
-        box = SecretBox(key)
+    def secretbox_decrypt(b64key: bytes, encrypted: bytes) -> bytes:
+        box = SecretBox(b64key, encoder=Base64Encoder)
         return box.decrypt(encrypted)
 
