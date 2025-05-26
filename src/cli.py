@@ -5,6 +5,7 @@ from src.fskeys import Fskeys, Keystore
 from src.token import Token
 from src.file import File
 from src.helpers import log
+from src.daemon import Client
 
 
 def _handle_deletion(args: Namespace,
@@ -56,6 +57,10 @@ def _handle_delegation(args: Namespace, filekey: str) -> None:
 def handle_call(args: Namespace) -> None:
     Fskeys.init(verbose=args.verbose)
 
+    if args.client:
+        Client.call_daemon()
+        exit(0)
+
     (was_encrypted, prevkey) = Keystore.search_entry_state(args.file)
 
     is_deletion = args.delete
@@ -89,6 +94,7 @@ if __name__ == "__main__":
                             "file access control using a semi capabilities " \
                             "model and encryption.")
     parser.add_argument("file")
+    parser.add_argument("--client", "-c", action="store_true")
     parser.add_argument("--verbose", "-v", action="store_true")
     parser.add_argument("--encrypt", "-e", action="store_true")
     parser.add_argument("--rotate", "-r", action="store_true")
