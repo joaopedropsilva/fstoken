@@ -1,0 +1,19 @@
+[Unit]
+Description=fstoken service
+After=network.target
+
+[Service]
+ExecStart=/opt/fstoken/venv/bin/python /opt/fstoken/src/daemon.py
+
+User=fstoken
+Group=fstoken
+
+RuntimeDirectory=fstokend
+RuntimeDirectoryMode=0770
+
+Type=simple
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+
