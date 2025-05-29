@@ -20,7 +20,8 @@ sudo cp -r $CWD/src $APP_PREFIX/src
 
 echo "Setting up permissions"
 sudo chown --recursive fstoken:fstoken $APP_PREFIX
-sudo chmod --recursive 755 $APP_PREFIX
+sudo chmod --recursive 644 $APP_PREFIX
+sudo chmod 755 $APP_PREFIX $APP_PREFIX/fstn $APP_PREFIX/src
 sudo chmod 440 $APP_PREFIX/$DAEMON
 
 echo "Creating python virtual environment"
