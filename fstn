@@ -1,0 +1,13 @@
+#!/usr/bin/bash
+
+APP_PREFIX=/opt/fstoken
+PYTHON_PATH=$APP_PREFIX/venv/bin/python
+
+if [ ! -f "$PYTHON_PATH" ]; then
+    echo "Exiting..."
+    echo "Must initialize application with setup.sh before usage"
+    exit
+fi
+
+$PYTHON_PATH $APP_PREFIX/src/cli.py "$@"
+
