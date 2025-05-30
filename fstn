@@ -9,5 +9,5 @@ if [ ! -f "$PYTHON_PATH" ]; then
     exit
 fi
 
-$PYTHON_PATH -m src.cli "$@"
+PYTHONPATH=$APP_PREFIX $PYTHON_PATH -m src.cli "$@"
 
