@@ -37,6 +37,9 @@ sudo useradd \
     fstoken
 sudo usermod -L fstoken
 
+echo "Adding user to fstoken group"
+sudo usermod -aG fstoken $USER
+
 echo "Setting up daemon"
 sudo cp $APP_PREFIX/$DAEMON /etc/systemd/system
 sudo systemctl daemon-reexec
