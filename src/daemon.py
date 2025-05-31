@@ -1,4 +1,4 @@
-from os import path, remove
+from os import path, remove, chmod
 from socket import socket, AF_UNIX, SOCK_STREAM
 from threading import Thread
 from time import sleep
@@ -14,15 +14,15 @@ class Daemon:
         conn.close()
 
     @classmethod
-    def main(cls):
+    def main(cls) -> None:
         if path.exists(cls.SOCK_ADDRESS):
             remove(cls.SOCK_ADDRESS)
 
         answer_threads = []
         with socket(AF_UNIX, SOCK_STREAM) as s:
             s.bind(cls.SOCK_ADDRESS)
+            chmod(cls.SOCK_ADDRESS, 0o660)
             s.listen()
-            print("Start listening")
 
             try:
                 while True:
