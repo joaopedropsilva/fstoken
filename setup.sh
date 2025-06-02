@@ -2,6 +2,7 @@
 
 CWD="$(realpath "$(dirname @)")"
 DAEMON=fstokend.service
+DAEMON_RUNTIME_DIR=/run/fstokend
 APP_PREFIX=/opt/fstoken
 
 echo "Checking daemon status"
@@ -44,6 +45,12 @@ echo "Setting up daemon"
 sudo cp $APP_PREFIX/$DAEMON /etc/systemd/system
 sudo systemctl daemon-reexec
 sudo systemctl enable --now $DAEMON
+
+echo "Creating keystore.db"
+sudo mkdir -p $DAEMON_RUNTIME_DIR
+sudo touch $DAEMON_RUNTIME_DIR/keystore.db
+sudo chmod 600 $DAEMON_RUNTIME_DIR/keystore.db
+sudo chown fstoken:fstoken $DAEMON_RUNTIME_DIR/keystore.db
 
 echo "Adding cli to user PATH"
 export PATH=$PATH:$APP_PREFIX
