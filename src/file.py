@@ -1,4 +1,5 @@
 from pathlib import Path
+from subprocess import run, CalledProcessError
 from functools import partial
 
 from src.nacl import NaclBinder
@@ -6,6 +7,7 @@ from src.helpers import log
 
 
 class File:
+    _FSTOKEN_USER = "fstoken"
     _OP_NOT_PERMITTED_MSG = \
         "Unable to {op} file: {file} (operation not permitted)\n" \
         "Make sure you have the correct access rights to perform this operation"
@@ -59,4 +61,24 @@ class File:
             return False
 
         return True
+
+    @classmethod
+    def grant_fstoken_access(cls, file: str) -> None:
+        file = str(Path(file).resolve())
+        try:
+            run(["setfacl", "-m", f"u:{cls._FSTOKEN_USER}:rw-", file],
+                check=True)
+        except CalledProcessError:
+            log(f"Failed to grant fstoken user access to file: {file}",
+                verbose=True)
+
+    @classmethod
+    def revoke_fstoken_access(cls, file: str) -> None:
+        filepath = Path(file)
+        try:
+            run(["setfacl", "-x", f"u:{cls._FSTOKEN_USER}", file],
+                check=True)
+        except CalledProcessError:
+            log(f"Failed to revoke fstoken user access to file: {file}",
+                verbose=True)
 
