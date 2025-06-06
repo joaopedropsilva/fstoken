@@ -1,23 +1,29 @@
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
 
-from src.keystore import Keystore
 from src.fskeys import Fskeys
-from src.token import Token
 from src.file import File
+from src.daemon import Client
 
 
 def handle_call(args: Namespace) -> None:
+    operation = "addition"
     is_deletion = args.delete
     is_delegation = args.grant and args.subject
+    if is_deletion:
+        operation = "deletion"
     is_invocation = args.token and not is_delegation
+    if is_invocation:
+        operation = "invocation"
 
     if is_deletion:
-        File.revoke_fstoken_access(args.file)
+        pass
+        #File.revoke_fstoken_access(args.file)
     if not is_invocation:
-        File.grant_fstoken_access(args.file)
+        pass
+        #File.grant_fstoken_access(args.file)
 
-    Keystore.change(args)
+    Client.call_daemon(operation, args)
 
 
 if __name__ == "__main__":
