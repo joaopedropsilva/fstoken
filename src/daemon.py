@@ -5,7 +5,29 @@ from os import path, remove, chmod
 from socket import socket, AF_UNIX, SOCK_STREAM
 from concurrent.futures import ThreadPoolExecutor
 
-from src.helpers import OpResult, log, log_err
+from src.helpers import log, log_err
+from src.operation import BaseOp
+
+
+class _SocketMessage:
+    @staticmethod
+    def from_bytes(as_bytes: bytes) -> "_SocketMessage":
+        return loads(as_bytes)
+
+    def __init__(self, payload: Any, err: str):
+        self._payload = payload
+        self._err = err
+
+    def __bytes__(self) -> bytes:
+        return dumps(self)
+
+    @property
+    def payload(self) -> Any:
+        return self._payload
+
+    @property
+    def err(self) -> str:
+        return self._err
 
 
 class Daemon:
@@ -14,11 +36,14 @@ class Daemon:
 
     @staticmethod
     def _answer_request(conn: socket) -> None:
-        data = conn.recv(Client.MAX_MESSAGE_SIZE)
-        op_args_repr = loads(data)
+        operation = \
+            _SocketMessage \
+            .from_bytes(conn.recv(Client.MAX_MESSAGE_SIZE)) \
+            .payload
 
-        (operation, args_repr) = op_args_repr.split(Client.OP_ARGS_SEP)
-        conn.sendall(dumps(res))
+        (result, err) = operation.run_priviledged()
+        # implement client answer
+
         conn.close()
 
     @classmethod
@@ -26,13 +51,12 @@ class Daemon:
         if path.exists(cls.SOCK_ADDRESS):
             remove(cls.SOCK_ADDRESS)
 
-        with socket(AF_UNIX, SOCK_STREAM) as s:
-            s.bind(cls.SOCK_ADDRESS)
+        with socket(AF_UNIX, SOCK_STREAM) as daemon_socket:
+            daemon_socket.bind(cls.SOCK_ADDRESS)
             chmod(cls.SOCK_ADDRESS, 0o660)
-            s.listen()
+            daemon_socket.listen()
 
             while True:
-                print("accepting")
                 (conn, _) = daemon_socket.accept()
 
                 with ThreadPoolExecutor() as executor:
@@ -40,7 +64,6 @@ class Daemon:
 
 
 class Client:
-    OP_ARGS_SEP = "__"
     MAX_MESSAGE_SIZE = 1024
 
     @staticmethod
@@ -56,41 +79,28 @@ class Client:
 
         return data
 
-    @staticmethod
-    def _interpret_daemon_answer(as_bytes) -> OpResult:
-
     @classmethod
-    def _get_op_args_repr(cls, operation: str, args: Namespace) -> bytes:
-        args_repr = ""
-        all_args = \
-            repr(args) \
-            .replace("Namespace(", "") \
-            .replace(")", "") \
-            .split(", ")
-        for index, arg_str in enumerate(all_args):
-            if index != len(all_args):
-                args_repr += f"{arg_str};"
-                continue
-            args_repr += f"{arg_str}"
-
-        op_args_repr = f"{operation}{cls.OP_ARGS_SEP}{args_repr}"
-
-        return dumps(op_args_repr)
-
-    @classmethod
-    def call_daemon(cls, operation: str, args: Namespace) -> None:
+    def _call(cls, operation: BaseOp) -> None:
         with socket(AF_UNIX, SOCK_STREAM) as conn:
             conn.connect(Daemon.SOCK_ADDRESS)
+            conn.sendall(bytes(_SocketMessage(operation, "")))
 
-            conn.sendall(cls._get_op_args_repr(operation, args))
+            return
 
             answer_size = cls._partial_recv(Daemon.LENGTH_HEADER_SIZE, conn)
-            daemon_answer = conn.recv(answer_size)
-            (result, errors) = cls._interpret_daemon_answer(daemon_answer)
+            daemon_answer = _SocketMessage.from_bytes(conn.recv(answer_size))
 
-            log(result, verbose=True)
-            log_err(errors)
+            if daemon_answer.payload:
+                log(result, verbose=True)
+            if daemon_answer.err:
+                log_err(err)
 
+    @classmethod
+    def call_daemon(cls, operation: BaseOp) -> None:
+        try:
+            cls._call(operation)
+        except ConnectionError:
+            log_err("Failed to connect with fstoken daemon")
 
 if __name__ == "__main__":
     Daemon.main()

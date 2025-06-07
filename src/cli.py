@@ -1,29 +1,16 @@
 from argparse import ArgumentParser, Namespace
-from pathlib import Path
 
-from src.fskeys import Fskeys
-from src.file import File
 from src.daemon import Client
+from src.operation import OperationRegistry
+from src.helpers import log_err
 
 
 def handle_call(args: Namespace) -> None:
-    operation = "addition"
-    is_deletion = args.delete
-    is_delegation = args.grant and args.subject
-    if is_deletion:
-        operation = "deletion"
-    is_invocation = args.token and not is_delegation
-    if is_invocation:
-        operation = "invocation"
+    op = OperationRegistry.get_operation_by_args(args)
 
-    if is_deletion:
-        pass
-        #File.revoke_fstoken_access(args.file)
-    if not is_invocation:
-        pass
-        #File.grant_fstoken_access(args.file)
+    op.run_unpriviledged()
 
-    Client.call_daemon(operation, args)
+    Client.call_daemon(op)
 
 
 if __name__ == "__main__":
