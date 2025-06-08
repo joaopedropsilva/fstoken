@@ -1,33 +1,11 @@
-from typing import Any
-from pickle import loads, dumps
 from argparse import Namespace
 from os import path, remove, chmod
 from socket import socket, AF_UNIX, SOCK_STREAM
+from struct import pack, unpack
 from concurrent.futures import ThreadPoolExecutor
 
 from src.operation import BaseOp
-from src.helpers import OpResult
-
-
-class _SocketMessage:
-    @staticmethod
-    def from_bytes(as_bytes: bytes) -> "_SocketMessage":
-        return loads(as_bytes)
-
-    def __init__(self, payload: Any, err: str):
-        self._payload = payload
-        self._err = err
-
-    def __bytes__(self) -> bytes:
-        return dumps(self)
-
-    @property
-    def payload(self) -> Any:
-        return self._payload
-
-    @property
-    def err(self) -> str:
-        return self._err
+from src.helpers import OpResult, SocketMessage
 
 
 class Daemon:
@@ -37,12 +15,15 @@ class Daemon:
     @staticmethod
     def _answer_request(conn: socket) -> None:
         operation = \
-            _SocketMessage \
+            SocketMessage \
             .from_bytes(conn.recv(Client.MAX_MESSAGE_SIZE)) \
             .payload
 
         (err, result) = operation.run_priviledged()
-        # implement client answer
+
+        answer = bytes(SocketMessage(result, err))
+        length_header = pack("!I", len(answer))
+        conn.sendall(length_header + answer)
 
         conn.close()
 
@@ -67,28 +48,36 @@ class Client:
     MAX_MESSAGE_SIZE = 1024
 
     @staticmethod
-    def _partial_recv(size: int, conn: socket) -> bytes:
+    def _get_answer_size(length_header_size: int, conn: socket) -> int:
         data = b""
 
-        while len(data) < size:
-            bytes_received = conn.recv(size - len(data))
+        could_read = True
+        while len(data) < length_header_size:
+            bytes_received = conn.recv(length_header_size - len(data))
             if not bytes_received:
-                return bytes()
+                could_read = False
 
             data += bytes_received
 
-        return data
+        if not could_read:
+            return 0
+
+        size = unpack("!I", data)[0]
+
+        return int(size)
 
     @classmethod
     def _call(cls, operation: BaseOp) -> OpResult:
         with socket(AF_UNIX, SOCK_STREAM) as conn:
             conn.connect(Daemon.SOCK_ADDRESS)
-            conn.sendall(bytes(_SocketMessage(operation, "")))
+            conn.sendall(bytes(SocketMessage(operation, "")))
 
-            answer_size = cls._partial_recv(Daemon.LENGTH_HEADER_SIZE, conn)
-            daemon_answer = _SocketMessage.from_bytes(conn.recv(answer_size))
+            answer_size = cls._get_answer_size(Daemon.LENGTH_HEADER_SIZE, conn)
+            if answer_size == 0:
+                return "Failed to get operation result from daemon", ""
+            daemon_answer = SocketMessage.from_bytes(conn.recv(answer_size))
 
-            return str(daemon_answer.payload), daemon_answer.err
+            return daemon_answer.err, str(daemon_answer.payload)
 
     @classmethod
     def call_daemon(cls, operation: BaseOp) -> OpResult:
