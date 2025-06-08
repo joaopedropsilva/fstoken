@@ -40,7 +40,7 @@ class  File:
         cls._rewrite_file(filepath, encrypt_fn)
 
     @classmethod
-    def grant_fstoken_access(cls, file: str) -> str
+    def grant_fstoken_access(cls, file: str) -> str:
         file = str(Path(file).resolve())
         try:
             run(["setfacl", "-m", f"u:{cls._FSTOKEN_USER}:rw-", file],
