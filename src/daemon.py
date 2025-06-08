@@ -5,8 +5,8 @@ from os import path, remove, chmod
 from socket import socket, AF_UNIX, SOCK_STREAM
 from concurrent.futures import ThreadPoolExecutor
 
-from src.helpers import log, log_err
 from src.operation import BaseOp
+from src.helpers import OpResult
 
 
 class _SocketMessage:
@@ -41,7 +41,7 @@ class Daemon:
             .from_bytes(conn.recv(Client.MAX_MESSAGE_SIZE)) \
             .payload
 
-        (result, err) = operation.run_priviledged()
+        (err, result) = operation.run_priviledged()
         # implement client answer
 
         conn.close()
@@ -80,27 +80,24 @@ class Client:
         return data
 
     @classmethod
-    def _call(cls, operation: BaseOp) -> None:
+    def _call(cls, operation: BaseOp) -> OpResult:
         with socket(AF_UNIX, SOCK_STREAM) as conn:
             conn.connect(Daemon.SOCK_ADDRESS)
             conn.sendall(bytes(_SocketMessage(operation, "")))
 
-            return
-
             answer_size = cls._partial_recv(Daemon.LENGTH_HEADER_SIZE, conn)
             daemon_answer = _SocketMessage.from_bytes(conn.recv(answer_size))
 
-            if daemon_answer.payload:
-                log(result, verbose=True)
-            if daemon_answer.err:
-                log_err(err)
+            return str(daemon_answer.payload), daemon_answer.err
 
     @classmethod
-    def call_daemon(cls, operation: BaseOp) -> None:
+    def call_daemon(cls, operation: BaseOp) -> OpResult:
         try:
-            cls._call(operation)
+            (call_err, call_result) = cls._call(operation)
         except ConnectionError:
-            log_err("Failed to connect with fstoken daemon")
+            return "Failed to connect with fstoken daemon", ""
+
+        return call_err, call_result
 
 if __name__ == "__main__":
     Daemon.main()

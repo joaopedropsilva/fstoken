@@ -3,14 +3,10 @@ from subprocess import run, CalledProcessError
 from functools import partial
 
 from src.nacl import NaclBinder
-from src.helpers import log
 
 
-class File:
+class  File:
     _FSTOKEN_USER = "fstoken"
-    _OP_NOT_PERMITTED_MSG = \
-        "Unable to {op} file: {file} (operation not permitted)\n" \
-        "Make sure you have the correct access rights to perform this operation"
 
     @staticmethod
     def _rewrite_file(filepath: Path, content_producer_fn: callable) -> None:
@@ -25,60 +21,43 @@ class File:
     @staticmethod
     def decrypt_to_read(file: str, b64key: bytes | str) -> str:
         filepath = Path(pathlike)
-        try:
-            with open(filepath, "rb") as file:
-                encrypted = file.read()
+        with open(filepath, "rb") as file:
+            encrypted = file.read()
 
-                return NaclBinder.secretbox_decrypt(encrypted, b64key) \
-                        .decode("utf-8")
-        except PermissionError:
-            log(cls._OP_NOT_PERMITTED_MSG.format(op="decrypt", file=file),
-                verbose=True)
-            return ""
+            return NaclBinder.secretbox_decrypt(encrypted, b64key) \
+                .decode("utf-8")
 
     @classmethod
-    def decrypt(cls, file: str, b64key: bytes | str) -> bool:
+    def decrypt(cls, file: str, b64key: bytes | str) -> None:
         filepath = Path(file)
         decrypt_fn = partial(NaclBinder.secretbox_decrypt, b64key)
-        try:
-            cls._rewrite_file(filepath, decrypt_fn)
-        except PermissionError:
-            log(cls._OP_NOT_PERMITTED_MSG.format(op="decrypt", file=file),
-                verbose=True)
-            return False
-
-        return True
+        cls._rewrite_file(filepath, decrypt_fn)
 
     @classmethod
-    def encrypt(cls, file: str, b64key: bytes | str) -> bool:
+    def encrypt(cls, file: str, b64key: bytes | str) -> None:
         filepath = Path(file)
         encrypt_fn = partial(NaclBinder.secretbox_encrypt, b64key)
-        try:
-            cls._rewrite_file(filepath, encrypt_fn)
-        except PermissionError:
-            log(cls._OP_NOT_PERMITTED_MSG.format(op="encrypt", file=file),
-                verbose=True)
-            return False
-
-        return True
+        cls._rewrite_file(filepath, encrypt_fn)
 
     @classmethod
-    def grant_fstoken_access(cls, file: str) -> None:
+    def grant_fstoken_access(cls, file: str) -> str
         file = str(Path(file).resolve())
         try:
             run(["setfacl", "-m", f"u:{cls._FSTOKEN_USER}:rw-", file],
                 check=True)
         except CalledProcessError:
-            log(f"Failed to grant fstoken user access to file: {file}",
-                verbose=True)
+            return f"Failed to grant fstoken user access to file: {file}"
+
+        return ""
 
     @classmethod
-    def revoke_fstoken_access(cls, file: str) -> None:
+    def revoke_fstoken_access(cls, file: str) -> str:
         filepath = Path(file)
         try:
             run(["setfacl", "-x", f"u:{cls._FSTOKEN_USER}", file],
                 check=True)
         except CalledProcessError:
-            log(f"Failed to revoke fstoken user access to file: {file}",
-                verbose=True)
+            return f"Failed to revoke fstoken user access to file: {file}"
+
+        return ""
 

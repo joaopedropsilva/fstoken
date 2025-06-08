@@ -2,12 +2,15 @@ from sys import stderr
 from typing import NewType
 
 
-def log(message: str, verbose: bool) -> None:
-    if not verbose:
-        return
-    print(message, file)
+OpResult = NewType("OpResult", tuple[str, str])
+
+
+def log(message: str) -> None:
+    print(message)
 
 
 def log_err(message: str) -> None:
+    if message == "":
+        return
     print(message, file=stderr)
 

@@ -12,13 +12,13 @@ class Fskeys:
     DIRPATH = Path(_HOME, DIRNAME)
 
     @classmethod
-    def init(cls, verbose: bool = False) -> None:
-        log(f"Checking for {cls.DIRNAME} existence", verbose)
+    def init(cls) -> None:
+        log(f"Checking for {cls.DIRNAME} existence")
         if not cls.DIRPATH.exists():
-            log(f"Creating {cls.DIRNAME}", verbose)
+            log(f"Creating {cls.DIRNAME}")
             cls.DIRPATH.mkdir(mode=0o700)
  
-        log("Checking for keys existence", verbose)
+        log("Checking for keys existence")
         should_keygen = False
         for file_ext in ["prv", "pub"]:
             key_file = Path(cls.DIRPATH, f"{cls._KEYNAME}.{file_ext}")
@@ -27,7 +27,7 @@ class Fskeys:
                 key_file.touch(mode=0o600)
 
         if should_keygen:
-            log("Generating keys", verbose)
+            log("Generating keys")
             (private, public) = NaclBinder.x25519_keygen()
 
             prv_path = Path(cls.DIRPATH, f"{cls._KEYNAME}.prv")
@@ -36,12 +36,6 @@ class Fskeys:
             pub_path = Path(cls.DIRPATH, f"{cls._KEYNAME}.pub")
             with open(pub_path, "w") as pub_file:
                 pub_file.write(public.decode("utf-8"))
-
-        log("Checking keystore existence", verbose)
-        keystore = Path(cls.DIRPATH, Keystore.STORE_FILENAME)
-        if not keystore.exists():
-            log("Creating keystore", verbose)
-            Keystore.create()
 
     @classmethod
     def get_keys(cls) -> tuple[str, str]:
