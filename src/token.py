@@ -1,7 +1,41 @@
 from base64 import b64encode, b64decode
 from pickle import dumps, loads
+from enum import Enum
 
 from src.nacl import NaclBinder
+
+
+class Grants(Enum):
+    READ = "r"
+    READ_WRITE = "rw"
+
+    @classmethod
+    def get_available_names(cls) -> list[str]:
+        return list(map(lambda k: k.lower().replace("_", "/"),
+                        cls.__members__.keys()))
+
+    @classmethod
+    def map_to_available_grants(incoming_grant: str) -> "Grants" | None:
+        eval_grant = incoming_grant.strip().split(" ")
+
+        is_read = \
+            "r" in eval_grant \
+            or "read" in eval_grant \
+            else ""
+
+        is_read_write = \
+            "rw" in eval_grant \
+            or "read/write" in eval_grant \
+            or "write" in eval_grant \
+            else ""
+
+        if not is_read or not is_read_write:
+            return None
+
+        if is_read_write:
+            return cls("rw")
+
+        return cls("r")
 
 
 class Token:
@@ -22,7 +56,6 @@ class Token:
         ("subject", str),
         ("proof", list)
     ]
-    _available_grants = ["READ", "READ/WRITE"]
 
     @staticmethod
     def _get_file_designator_hash(filekey: str, grant: str) -> str:
@@ -53,16 +86,17 @@ class Token:
     @classmethod
     def _validate_file_designator(cls,
                                   designator: str,
-                                  filekey: str) -> str:
-        authorized_grant = ""
-        for grant in cls._available_grants:
-            hashed = cls._get_file_designator_hash(filekey, grant)
+                                  filekey: str) -> Grants:
+        authorized_grant = None
+        for grant in Grants.__iter__():
+            hashed = cls._get_file_designator_hash(filekey,
+                                                   repr(grant))
             if not hashed == designator:
                 continue
 
             authorized_grant = grant
 
-        assert authorized_grant != "", \
+        assert authorized_grant is not None, \
             "Invalid grant or key decoded from token"
 
         return authorized_grant
@@ -71,19 +105,18 @@ class Token:
     def _build_processed_payload(cls, raw_payload: dict) -> bytes:
         cls._validate_payload_fields(raw_payload, cls._raw_payload_fields)
 
-        grant = raw_payload["grant"].upper()
-        assert grant in cls._available_grants, \
-            f"Invalid grant for file, must be: {cls._available_grants}"
+        grant = Grants.map_to_available_grants(raw_payload["grant"])
+        assert grant is not None, \
+            f"Invalid grant for file, must be: {Grants.get_available_names()}"
 
         processed_payload = {
             "file_designator": \
                 cls._get_file_designator_hash(raw_payload["filekey"],
-                                              raw_payload["grant"]),
+                                              repr(grant)),
             "subject": raw_payload["subject"],
             "proof": raw_payload["proof"]
         }
 
-        # Check pickle safety
         return dumps(processed_payload)
 
     @classmethod
@@ -100,7 +133,10 @@ class Token:
         return f"{public_key}.{payload}.{signature}"
 
     @classmethod
-    def validate(cls, token: str, grant: str, filekey: str) -> str:
+    def validate(cls,
+                 token: str,
+                 grant: Grants | None,
+                 filekey: str) -> Grants:
         if token == "":
             return grant
 
