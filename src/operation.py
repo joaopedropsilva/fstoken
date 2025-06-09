@@ -61,8 +61,9 @@ class Invoke(BaseOp):
             return f"File not found in {Keystore.STORE_FILENAME}", ""
 
         try:
-            is_valid = Token.validate(args.token, filekey)
-            if not is_valid:
+            initial_grant = ""
+            extracted_grant = Token.validate(args.token, filekey)
+            if extracted_grant == "":
                 return f"Invalid access token to {self._args.file}", ""
         except (AssertionError, KeyError) as err:
             return err, "" 

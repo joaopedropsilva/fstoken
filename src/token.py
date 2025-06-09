@@ -53,7 +53,7 @@ class Token:
     @classmethod
     def _validate_file_designator(cls,
                                   designator: str,
-                                  filekey: str) -> None:
+                                  filekey: str) -> str:
         authorized_grant = ""
         for grant in cls._available_grants:
             hashed = cls._get_file_designator_hash(filekey, grant)
@@ -64,6 +64,8 @@ class Token:
 
         assert authorized_grant != "", \
             "Invalid grant or key decoded from token"
+
+        return authorized_grant
 
     @classmethod
     def _build_processed_payload(cls, raw_payload: dict) -> bytes:
@@ -98,9 +100,9 @@ class Token:
         return f"{public_key}.{payload}.{signature}"
 
     @classmethod
-    def validate(cls, token: str, filekey: str) -> bool:
+    def validate(cls, token: str, grant: str, filekey: str) -> str:
         if token == "":
-            return True
+            return grant
 
         (public_key, payload_bytes, signature) = cls._get_segments_from(token)
 
@@ -110,8 +112,8 @@ class Token:
         cls._validate_payload_fields(payload, cls._processed_payload_fields)
 
         designator = payload["file_designator"]
-        cls._validate_file_designator(designator, filekey)
+        grant = cls._validate_file_designator(designator, filekey)
 
         next_token = next((t for t in payload["proof"] if t != token), "")
-        return cls.validate(next_token, filekey)
+        return cls.validate(next_token, grant, filekey)
 
