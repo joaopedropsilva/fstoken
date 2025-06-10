@@ -15,21 +15,21 @@ class Grants(Enum):
                         cls.__members__.keys()))
 
     @classmethod
-    def map_to_available_grants(incoming_grant: str) -> "Grants" | None:
+    def map_to_available_grants(cls, incoming_grant: str) -> "Grants":
         eval_grant = incoming_grant.strip().split(" ")
 
         is_read = \
-            "r" in eval_grant \
-            or "read" in eval_grant \
-            else ""
+            True \
+            if "r" in eval_grant or "read" in eval_grant \
+            else False
 
         is_read_write = \
-            "rw" in eval_grant \
-            or "read/write" in eval_grant \
-            or "write" in eval_grant \
-            else ""
+            True \
+            if "rw" in eval_grant \
+            or "read/write" in eval_grant or "write" in eval_grant \
+            else False
 
-        if not is_read or not is_read_write:
+        if not is_read and not is_read_write:
             return None
 
         if is_read_write:
@@ -59,8 +59,11 @@ class Token:
 
     @staticmethod
     def _get_file_designator_hash(filekey: str, grant: str) -> str:
-        designator = f"{filekey}.{grant}"
-        return NaclBinder.sha256_hash(b"{designator}").decode("utf-8")
+        key = filekey.split("\n")[0]  # prevents malformed keystrings
+        designator = f"{key}.{grant}"
+
+        return \
+            NaclBinder.sha256_hash(designator.encode("utf-8")).decode("utf-8")
 
     @staticmethod
     def _get_segments_from(raw_token: str) -> tuple[bytes, bytes, bytes]:

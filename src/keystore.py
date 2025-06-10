@@ -29,7 +29,7 @@ class Keystore:
 
     @classmethod
     def search_entry_state(cls, file: str) -> tuple[bool, str]:
-        with open(_KEYSTORE_PATH, "r") as ks:
+        with open(cls._KEYSTORE_PATH, "r") as ks:
             entries = list(map(lambda line: line.split(cls._ENTRY_DATA_SEP),
                                ks.readlines()))
 
@@ -45,13 +45,13 @@ class Keystore:
 
     @classmethod
     def _append(cls, entry: tuple[str, str, str]) -> None:
-        with open(_KEYSTORE_PATH, "a") as ks:
+        with open(cls._KEYSTORE_PATH, "a") as ks:
             ks.write(cls._create_entry_repr(entry))
 
     @classmethod
     def _get_all_entries(cls) -> list[tuple[str, str, str]]:
         all_entries = []
-        with open(_KEYSTORE_PATH, "r") as ks:
+        with open(cls._KEYSTORE_PATH, "r") as ks:
             entries = list(map(lambda l: l.split(cls._ENTRY_DATA_SEP),
                                ks.readlines()))
 
@@ -66,7 +66,7 @@ class Keystore:
     @classmethod
     def _truncate_and_rewrite_lines(
             cls, entries: list[tuple[str, str, str]]) -> None:
-        with open(_KEYSTORE_PATH, "w") as ks:
+        with open(cls._KEYSTORE_PATH, "w") as ks:
             for entry in entries:
                 ks.write(cls._create_entry_repr(entry))
 

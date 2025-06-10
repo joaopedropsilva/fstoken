@@ -1,5 +1,6 @@
 from argparse import Namespace
 
+from src.token import Token
 from src.file import File
 from src.helpers import OpResult
 from src.fskeys import Fskeys
@@ -46,7 +47,7 @@ class Delete(BaseOp):
         Keystore.change_entry(self._args.file, delete=True)
 
         if was_encrypted:
-            File.decrypt(self._args.file, filekey)
+            File.decrypt(self._args.file, prevkey)
 
         return "", ""
 
@@ -62,7 +63,9 @@ class Invoke(BaseOp):
 
         try:
             initial_grant = None
-            extracted_grant = Token.validate(args.token, initial_grant, filekey)
+            extracted_grant = Token.validate(self._args.token,
+                                             initial_grant,
+                                             prevkey)
         except (AssertionError, KeyError) as err:
             return err, "" 
 
@@ -76,7 +79,7 @@ class Add(BaseOp):
         super().__init__(args)
 
     def run_unpriviledged(self) -> str:
-        grant_err = File.grant_fstoken_access(self._args)
+        grant_err = File.grant_fstoken_access(self._args.file)
         if grant_err != "":
             return grant_err
 
@@ -98,10 +101,10 @@ class Add(BaseOp):
 
         if was_encrypted:
             File.decrypt(self._args.file, prevkey)
-        if args.encrypt:
+        if self._args.encrypt:
             File.encrypt(self._args.file, newkey)
 
-        return "", filekey
+        return "", newkey
 
 
 class Delegate(Add):
