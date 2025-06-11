@@ -1,4 +1,5 @@
 from argparse import Namespace
+from pathlib import Path
 
 from src.token import Token
 from src.file import File
@@ -69,9 +70,16 @@ class Invoke(BaseOp):
         except (AssertionError, KeyError) as err:
             return err, "" 
 
-        # open $EDITOR with permissions
+        try:
+            file_descriptor = open(Path(self._args.file), extracted_grant.value)
+        except FileNotFoundError:
+            return f"File {self._args.file} not found", ""
+        except PermissionError:
+            return f"Could not open {self._args.file}, " \
+                   f"fstoken user not authorized", ""
 
-        return "", ""
+        print(type(file_descriptor))
+        return "", file_descriptor
 
 
 class Add(BaseOp):

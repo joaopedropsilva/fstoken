@@ -2,7 +2,7 @@ from argparse import Namespace
 from os import path, remove, chmod
 from socket import socket, AF_UNIX, SOCK_STREAM
 from struct import pack, unpack
-from concurrent.futures import ThreadPoolExecutor
+from threading import Thread
 
 from src.operation import BaseOp
 from src.helpers import OpResult, SocketMessage
@@ -37,11 +37,18 @@ class Daemon:
             chmod(cls.SOCK_ADDRESS, 0o660)
             daemon_socket.listen()
 
-            while True:
-                (conn, _) = daemon_socket.accept()
+            conn_threads = []
+            try:
+                while True:
+                    (conn, _) = daemon_socket.accept()
 
-                with ThreadPoolExecutor() as executor:
-                    executor.submit(cls._answer_request, conn)
+
+                    t = Thread(target=cls._answer_request, args=(conn,))
+                    t.start()
+                    conn_threads.append(t)
+            except KeyboardInterrupt:
+                for t in conn_threads:
+                    t.join()
 
 
 class Client:

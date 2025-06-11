@@ -7,7 +7,7 @@ from src.nacl import NaclBinder
 
 class Grants(Enum):
     READ = "r"
-    READ_WRITE = "rw"
+    READ_WRITE = "a"
 
     @classmethod
     def get_available_names(cls) -> list[str]:
@@ -33,7 +33,7 @@ class Grants(Enum):
             return None
 
         if is_read_write:
-            return cls("rw")
+            return cls("a")
 
         return cls("r")
 
