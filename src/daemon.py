@@ -1,8 +1,10 @@
 from argparse import Namespace
 from os import path, remove, chmod
-from socket import socket, AF_UNIX, SOCK_STREAM
-from struct import pack, unpack
+from socket import \
+    socket, AF_UNIX, SOCK_STREAM, SOL_SOCKET, SCM_RIGHTS, CMSG_LEN
+from struct import pack, unpack, calcsize
 from threading import Thread
+from io import TextIOWrapper
 
 from src.operation import BaseOp
 from src.helpers import OpResult, SocketMessage
@@ -21,9 +23,19 @@ class Daemon:
 
         (err, result) = operation.run_priviledged()
 
-        answer = bytes(SocketMessage(result, err))
+        file = None
+        mode = None
+        if isinstance(result, tuple):
+            (file, mode) = result
+
+        answer = bytes(SocketMessage(result if mode is None else mode, err))
         length_header = pack("!I", len(answer))
-        conn.sendall(length_header + answer)
+
+        fd_data = []
+        if file:
+            fd_data = [(SOL_SOCKET, SCM_RIGHTS, pack("i", file.fileno()))]
+
+        conn.sendmsg([length_header + answer], fd_data)
 
         conn.close()
 
@@ -55,23 +67,37 @@ class Client:
     MAX_MESSAGE_SIZE = 1024
 
     @staticmethod
-    def _get_answer_size(length_header_size: int, conn: socket) -> int:
-        data = b""
-
-        could_read = True
+    def _get_answer(length_header_size: int,
+                    conn: socket) -> tuple[SocketMessage, TextIOWrapper | None]:
+        r_msg_length_bytes = b""
+        a_size_expected = CMSG_LEN(calcsize("i"))
+        failed_read = False
         while len(data) < length_header_size:
-            bytes_received = conn.recv(length_header_size - len(data))
-            if not bytes_received:
-                could_read = False
+            r_size_expected = length_header_size - len(data)
+            (raw_r_msg_length, anc_msg, _, _) = conn.recvmsg(r_size_expected,
+                                                             a_size_expected)
+            if not raw_r_msg_length:
+                failed_read = True
 
-            data += bytes_received
+            r_msg_length_bytes += raw_r_msg_length
 
-        if not could_read:
-            return 0
+        if failed_read:
+            return "Failed to get operation result from daemon", None
 
-        size = unpack("!I", data)[0]
+        r_msg_length = unpack("!I", r_msg_length_bytes)[0]
+        regular_msg = SocketMessage.from_bytes(conn.recv(r_msg_length))
 
-        return int(size)
+        fd = None
+        for cmsg_level, cmsg_type, cmsg_data in anc_msg:
+            if cmsg_level == SOL_SOCKET and cmsg_type == SCM_RIGHTS:
+                fd = unpack("i", cmsg_data)[0]
+        file = None
+        if fd:
+            mode = regular_msg.payload
+            file = open(fd, mode)
+            regular_msg.payload = ""
+
+        return regular_msg, file
 
     @classmethod
     def _call(cls, operation: BaseOp) -> OpResult:
@@ -79,12 +105,9 @@ class Client:
             conn.connect(Daemon.SOCK_ADDRESS)
             conn.sendall(bytes(SocketMessage(operation, "")))
 
-            answer_size = cls._get_answer_size(Daemon.LENGTH_HEADER_SIZE, conn)
-            if answer_size == 0:
-                return "Failed to get operation result from daemon", ""
-            daemon_answer = SocketMessage.from_bytes(conn.recv(answer_size))
+            (answer, file) = cls._get_answer(Daemon.LENGTH_HEADER_SIZE, conn)
 
-            return daemon_answer.err, str(daemon_answer.payload)
+            return answer.err, str(answer.payload)
 
     @classmethod
     def call_daemon(cls, operation: BaseOp) -> OpResult:

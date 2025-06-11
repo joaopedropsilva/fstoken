@@ -71,15 +71,14 @@ class Invoke(BaseOp):
             return err, "" 
 
         try:
-            file_descriptor = open(Path(self._args.file), extracted_grant.value)
+            file = open(Path(self._args.file), extracted_grant.value)
         except FileNotFoundError:
             return f"File {self._args.file} not found", ""
         except PermissionError:
             return f"Could not open {self._args.file}, " \
                    f"fstoken user not authorized", ""
 
-        print(type(file_descriptor))
-        return "", file_descriptor
+        return "", (file, extracted_grant.value)
 
 
 class Add(BaseOp):
