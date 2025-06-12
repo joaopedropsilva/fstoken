@@ -4,7 +4,7 @@ from pickle import loads, dumps
 from io import TextIOWrapper
 
 
-OpResult = NewType("OpResult", tuple[str, str | tuple[TextIOWrapper | str])
+OpResult = NewType("OpResult", tuple[str, str | tuple[TextIOWrapper | str]])
 
 
 def log(message: str) -> None:
@@ -35,7 +35,7 @@ class SocketMessage:
         return self._payload
 
     @payload.setter
-    def new_payload(self, new_payload: any) -> None:
+    def payload(self, new_payload: any) -> None:
         self._payload = new_payload
 
     @property

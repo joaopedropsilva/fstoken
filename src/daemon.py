@@ -72,8 +72,8 @@ class Client:
         r_msg_length_bytes = b""
         a_size_expected = CMSG_LEN(calcsize("i"))
         failed_read = False
-        while len(data) < length_header_size:
-            r_size_expected = length_header_size - len(data)
+        while len(r_msg_length_bytes) < length_header_size:
+            r_size_expected = length_header_size - len(r_msg_length_bytes)
             (raw_r_msg_length, anc_msg, _, _) = conn.recvmsg(r_size_expected,
                                                              a_size_expected)
             if not raw_r_msg_length:
