@@ -1,10 +1,9 @@
 from argparse import Namespace
-from os import path, remove, chmod
+from os import path, remove, chmod, getpid
 from socket import \
     socket, AF_UNIX, SOCK_STREAM, SOL_SOCKET, SCM_RIGHTS, CMSG_LEN
 from struct import pack, unpack, calcsize
 from threading import Thread
-from io import TextIOWrapper
 
 from src.operation import BaseOp
 from src.helpers import OpResult, SocketMessage
@@ -68,7 +67,7 @@ class Client:
 
     @staticmethod
     def _get_answer(length_header_size: int,
-                    conn: socket) -> tuple[SocketMessage, TextIOWrapper | None]:
+                    conn: socket) -> tuple[SocketMessage, int | None]:
         r_msg_length_bytes = b""
         a_size_expected = CMSG_LEN(calcsize("i"))
         failed_read = False
@@ -91,13 +90,8 @@ class Client:
         for cmsg_level, cmsg_type, cmsg_data in anc_msg:
             if cmsg_level == SOL_SOCKET and cmsg_type == SCM_RIGHTS:
                 fd = unpack("i", cmsg_data)[0]
-        file = None
-        if fd:
-            mode = regular_msg.payload
-            file = open(fd, mode)
-            regular_msg.payload = ""
 
-        return regular_msg, file
+        return regular_msg, fd
 
     @classmethod
     def _call(cls, operation: BaseOp) -> OpResult:
@@ -105,7 +99,11 @@ class Client:
             conn.connect(Daemon.SOCK_ADDRESS)
             conn.sendall(bytes(SocketMessage(operation, "")))
 
-            (answer, file) = cls._get_answer(Daemon.LENGTH_HEADER_SIZE, conn)
+            (answer, fd) = cls._get_answer(Daemon.LENGTH_HEADER_SIZE, conn)
+
+            from subprocess import run
+            fd_path = f"/proc/{getpid()}/fd/{fd}"
+            run(["nvim", fd_path])
 
             return answer.err, str(answer.payload)
 
