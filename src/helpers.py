@@ -23,8 +23,9 @@ class SocketMessage:
         obj = loads(as_bytes)
         return cls(obj.payload, obj.err)
 
-    def __init__(self, payload: any, err: str):
+    def __init__(self, payload: any, err: str, display_payload: bool = None):
         self._payload = payload
+        self._display_payload = display_payload
         self._err = err
 
     def __bytes__(self) -> bytes:
@@ -34,9 +35,9 @@ class SocketMessage:
     def payload(self) -> any:
         return self._payload
 
-    @payload.setter
-    def payload(self, new_payload: any) -> None:
-        self._payload = new_payload
+    @property
+    def display_payload(self) -> bool | None:
+        return self._display_payload
 
     @property
     def err(self) -> str:

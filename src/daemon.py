@@ -4,9 +4,11 @@ from socket import \
     socket, AF_UNIX, SOCK_STREAM, SOL_SOCKET, SCM_RIGHTS, CMSG_LEN
 from struct import pack, unpack, calcsize
 from threading import Thread
+from subprocess import run
 
 from src.operation import BaseOp
 from src.helpers import OpResult, SocketMessage
+from src.token import Grants
 
 
 class Daemon:
@@ -66,6 +68,18 @@ class Client:
     MAX_MESSAGE_SIZE = 1024
 
     @staticmethod
+    def _open_file(fd: int, mode: str) -> OpResult:
+        mode_args = ["-R"] if mode == Grants.READ.value else []
+        cmd = ["vim", f"/proc/{getpid()}/fd/{fd}"]
+        cmd.extend(mode_args)
+        try:
+            run(cmd)
+        except Exception as err:
+            return repr(err), ""
+
+        return "", ""
+
+    @staticmethod
     def _get_answer(length_header_size: int,
                     conn: socket) -> tuple[SocketMessage, int | None]:
         r_msg_length_bytes = b""
@@ -101,11 +115,15 @@ class Client:
 
             (answer, fd) = cls._get_answer(Daemon.LENGTH_HEADER_SIZE, conn)
 
-            from subprocess import run
-            fd_path = f"/proc/{getpid()}/fd/{fd}"
-            run(["nvim", fd_path])
+            err = answer.err
+            if fd:
+                (err, _) = cls._open_file(fd, str(answer.payload))
 
-            return answer.err, str(answer.payload)
+            call_result = ""
+            if answer.display_payload:
+                call_result = str(answer.payload)
+
+            return err, call_result
 
     @classmethod
     def call_daemon(cls, operation: BaseOp) -> OpResult:
