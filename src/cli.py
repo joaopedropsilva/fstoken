@@ -11,9 +11,9 @@ def handle_call(args: Namespace) -> None:
     op_unpriv_err = op.run_unpriviledged()
     log_err(op_unpriv_err)
 
-    (call_err, call_result) = Client.call_daemon(op)
-    log_err(call_err)
-    log(call_result)
+    call_result = Client.call_daemon(op)
+    log_err(call_resultl.err)
+    log(call_result.payload)
 
 
 if __name__ == "__main__":

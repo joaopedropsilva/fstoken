@@ -3,7 +3,7 @@ from pathlib import Path
 
 from src.token import Token
 from src.file import File
-from src.helpers import OpResult
+from src.helpers import Message
 from src.fskeys import Fskeys
 from src.keystore import Keystore
 
@@ -16,11 +16,14 @@ class BaseOp:
     def run_unpriviledged(self) -> str:
         return ""
 
-    def run_priviledged(self) -> OpResult:
+    def run_priviledged(self) -> Message:
         if not self._requester_has_access_to_file:
-            return f"Operation not allowed for user in {self._args.file}", ""
+            return Message(
+                payload="",
+                err=f"Operation not allowed for user in {self._args.file}"
+            )
 
-        return "", ""
+        return Message(payload="", err="")
 
 
 class Delete(BaseOp):
@@ -29,38 +32,46 @@ class Delete(BaseOp):
 
     def run_unpriviledged(self) -> str:
         revocation_err = File.revoke_fstoken_access(self._args.file)
-        if revocation_err != "":
+        if revocation_err:
             return revocation_err
 
         self._requester_has_access_to_file = True
 
         return ""
 
-    def run_priviledged(self) -> OpResult:
-        (access_error, _) = super().run_priviledged()
-        if access_error != "":
-            return access_error, ""
+    def run_priviledged(self) -> Message:
+        base_op_result = super().run_priviledged()
+        if base_op_result.err:
+            return base_op_result
 
         (was_encrypted, prevkey) = Keystore.search_entry_state(self._args.file)
         if prevkey == "":
-            return f"File not found in {Keystore.STORE_FILENAME}", ""
+            return Message(
+                payload="",
+                err=f"File not found in {Keystore.STORE_FILENAME}"
+            )
 
         Keystore.change_entry(self._args.file, delete=True)
 
         if was_encrypted:
             File.decrypt(self._args.file, prevkey)
 
-        return "", ""
+        return Message(payload="", err="")
 
 
 class Invoke(BaseOp):
     def __init__(self, args: Namespace):
         super().__init__(args)
 
-    def run_priviledged(self) -> OpResult:
+    def run_priviledged(self) -> Message:
+        result = (None, None)
+
         (was_encrypted, prevkey) = Keystore.search_entry_state(self._args.file)
         if prevkey == "":
-            return f"File not found in {Keystore.STORE_FILENAME}", ""
+            return Message(
+                payload=result,
+                err=f"File not found in {Keystore.STORE_FILENAME}"
+            )
 
         try:
             initial_grant = None
@@ -68,17 +79,19 @@ class Invoke(BaseOp):
                                              initial_grant,
                                              prevkey)
         except (AssertionError, KeyError) as err:
-            return err, "" 
+            return Message(payload=result, err=repr(err))
 
         try:
             file = open(Path(self._args.file), extracted_grant.value)
         except FileNotFoundError:
-            return f"File {self._args.file} not found", ""
+            return Message(payload=result, err=f"File {self._args.file} not found")
         except PermissionError:
-            return f"Could not open {self._args.file}, " \
-                   f"fstoken user not authorized", ""
+            return Message(
+                payload=result,
+                err=f"Could not open {self._args.file}, fstoken user not authorized"
+            )
 
-        return "", (file, extracted_grant.value)
+        return Message(payload=(file.fileno(), extracted_grant.value), err="")
 
 
 class Add(BaseOp):
@@ -87,17 +100,17 @@ class Add(BaseOp):
 
     def run_unpriviledged(self) -> str:
         grant_err = File.grant_fstoken_access(self._args.file)
-        if grant_err != "":
+        if grant_err:
             return grant_err
 
         self._requester_has_access_to_file = True
 
         return ""
 
-    def run_priviledged(self) -> OpResult:
-        (access_err, _) = super().run_priviledged()
-        if access_err != "":
-            return access_err, ""
+    def run_priviledged(self) -> Message:
+        base_op_result = super().run_priviledged()
+        if base_op_result.err:
+            return base_op_result
 
         (was_encrypted, prevkey) = Keystore.search_entry_state(self._args.file)
 
@@ -111,29 +124,29 @@ class Add(BaseOp):
         if self._args.encrypt:
             File.encrypt(self._args.file, newkey)
 
-        return "", newkey
+        return Message(payload=newkey, err="")
 
 
 class Delegate(Add):
     def __init__(self, args: Namespace):
         super().__init__(args)
 
-    def run_priviledged(self) -> OpResult:
-        (add_err, filekey) = super().run_priviledged()
-        if add_err != "":
-            return add_err, ""
+    def run_priviledged(self) -> Message:
+        add_op_result = super().run_priviledged()
+        if add_op_result.err:
+            return add_op_result
 
         (private, _) = Fskeys.get_keys()
         try:
             token = Token.encode(private,
-                                 raw_payload={"filekey": filekey,
+                                 raw_payload={"filekey": add_op_result.payload,
                                               "grant": self._args.grant,
                                               "subject": self._args.subject,
                                               "proof": [self._args.token]})
         except (AssertionError, KeyError) as err:
-            return err, ""
+            return Message(payload="", err=repr(err))
 
-        return "", token
+        return Message(payload=token, err="", hide_payload=False)
 
 
 class OperationRegistry:
