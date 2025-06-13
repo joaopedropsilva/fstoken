@@ -12,7 +12,7 @@ def handle_call(args: Namespace) -> None:
     log_err(op_unpriv_err)
 
     call_result = Client.call_daemon(op)
-    log_err(call_resultl.err)
+    log_err(call_result.err)
     log(call_result.payload)
 
 

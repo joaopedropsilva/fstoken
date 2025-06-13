@@ -79,7 +79,7 @@ class Invoke(BaseOp):
                                              initial_grant,
                                              prevkey)
         except (AssertionError, KeyError) as err:
-            return Message(payload=result, err=repr(err))
+            return Message(payload=result, err=err)
 
         try:
             file = open(Path(self._args.file), extracted_grant.value)
@@ -91,7 +91,7 @@ class Invoke(BaseOp):
                 err=f"Could not open {self._args.file}, fstoken user not authorized"
             )
 
-        return Message(payload=(file.fileno(), extracted_grant.value), err="")
+        return Message(payload=(file, extracted_grant.value), err="")
 
 
 class Add(BaseOp):
@@ -144,7 +144,7 @@ class Delegate(Add):
                                               "subject": self._args.subject,
                                               "proof": [self._args.token]})
         except (AssertionError, KeyError) as err:
-            return Message(payload="", err=repr(err))
+            return Message(payload="", err=err)
 
         return Message(payload=token, err="", hide_payload=False)
 

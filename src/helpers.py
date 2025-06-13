@@ -4,11 +4,13 @@ from pickle import loads, dumps
 
 
 def log(message: str) -> None:
+    if not message:
+        return
     print(message)
 
 
 def log_err(message: str) -> None:
-    if message == "":
+    if not message:
         return
     print(message, file=stderr)
 
@@ -17,7 +19,7 @@ class Message:
     @classmethod
     def from_bytes(cls, as_bytes: bytes) -> "Message":
         obj = loads(as_bytes)
-        return cls(obj.payload, obj.err)
+        return cls(obj.payload, obj.err, obj.hide_payload)
 
     def __init__(self, payload: any, err: str, hide_payload: bool = True):
         self._payload = payload
@@ -34,6 +36,10 @@ class Message:
     @property
     def err(self) -> str:
         return self._err
+
+    @property
+    def hide_payload(self) -> bool:
+        return self._hide_payload
 
     def get_exposable_payload(self) -> str:
         if self._hide_payload or not self._payload:

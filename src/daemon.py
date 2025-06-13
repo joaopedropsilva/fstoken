@@ -23,13 +23,20 @@ class Daemon:
             .payload
 
         op_result = operation.run_priviledged()
+        fd = None
+        mode = None
+        if isinstance(op_result.payload, tuple):
+            (file, mode) = op_result.payload
+            if not op_result.err:
+                fd = file.fileno()
 
-        r_msg = bytes(op_result)
+        r_msg = bytes(Message(payload=mode if mode is not None else op_result.payload,
+                              err=op_result.err,
+                              hide_payload=op_result.hide_payload))
         length_header = pack("!I", len(r_msg))
 
         fd_data = []
-        if isinstance(op_result.payload, tuple):
-            (fd, _) = op_result.payload
+        if fd:
             fd_data = [(SOL_SOCKET, SCM_RIGHTS, pack("i", fd))]
 
         conn.sendmsg([length_header + r_msg], fd_data)
@@ -115,8 +122,7 @@ class Client:
 
             err = answer.err
             if fd:
-                (_, mode) = answer.payload
-                err = cls._open_file(fd, mode)
+                err = cls._open_file(fd, answer.payload)
 
             return Message(
                 payload=answer.get_exposable_payload(),
