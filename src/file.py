@@ -20,11 +20,11 @@ class  File:
 
     @staticmethod
     def decrypt_to_read(file: str, b64key: bytes | str) -> str:
-        filepath = Path(pathlike)
+        filepath = Path(file)
         with open(filepath, "rb") as file:
             encrypted = file.read()
 
-            return NaclBinder.secretbox_decrypt(encrypted, b64key) \
+            return NaclBinder.secretbox_decrypt(b64key, encrypted) \
                 .decode("utf-8")
 
     @classmethod

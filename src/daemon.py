@@ -1,14 +1,47 @@
 from argparse import Namespace
-from os import path, remove, chmod, getpid
-from socket import \
-    socket, AF_UNIX, SOCK_STREAM, SOL_SOCKET, SCM_RIGHTS, CMSG_LEN
-from struct import pack, unpack, calcsize
+from os import path, remove, chmod
+from socket import socket, AF_UNIX, SOCK_STREAM
+from struct import pack, unpack
 from threading import Thread
-from subprocess import run
 
-from src.operation import BaseOp
+from src.operation import BaseOp, Invoke
 from src.helpers import Message
-from src.token import Grants
+
+
+class _SocketMessageBroker:
+    _LENGTH_HEADER_SIZE = 4
+    _LENGTH_HEADER_FORMAT = "!I"
+
+    @classmethod
+    def get_message(cls, conn: socket) -> Message:
+        msg_length_bytes = b""
+        failed_read = False
+        while len(msg_length_bytes) < cls._LENGTH_HEADER_SIZE:
+            expected_read_size = cls._LENGTH_HEADER_SIZE - len(msg_length_bytes)
+            length_bytes = conn.recv(expected_read_size)
+
+            if not length_bytes:
+                failed_read = True
+
+            msg_length_bytes += length_bytes
+
+        if failed_read:
+            return Message(payload=None, err="Failed to read message")
+
+        msg_length = unpack(cls._LENGTH_HEADER_FORMAT, msg_length_bytes)[0]
+        return Message.from_bytes(conn.recv(msg_length))
+
+    @classmethod
+    def send_message(cls, conn: socket, message: Message) -> None:
+        msg = bytes()
+        try:
+            msg = bytes(message)
+        except Exception as err:
+            msg = bytes(Message(payload=None,
+                                err=f"Failed to get message bytes: {repr(err)}"))
+
+        msg_length = pack(cls._LENGTH_HEADER_FORMAT, len(msg))
+        conn.sendall(msg_length + msg)
 
 
 class Daemon:
@@ -17,29 +50,16 @@ class Daemon:
 
     @staticmethod
     def _answer_request(conn: socket) -> None:
-        operation = \
-            Message \
-            .from_bytes(conn.recv(Client.MAX_MESSAGE_SIZE)) \
-            .payload
+        client_msg = _SocketMessageBroker.get_message(conn)
+        operation: BaseOp = client_msg.payload
 
         op_result = operation.run_priviledged()
-        fd = None
-        mode = None
-        if isinstance(op_result.payload, tuple):
-            (file, mode) = op_result.payload
-            if not op_result.err:
-                fd = file.fileno()
+        _SocketMessageBroker.send_message(conn, op_result)
 
-        r_msg = bytes(Message(payload=mode if mode is not None else op_result.payload,
-                              err=op_result.err,
-                              hide_payload=op_result.hide_payload))
-        length_header = pack("!I", len(r_msg))
-
-        fd_data = []
-        if fd:
-            fd_data = [(SOL_SOCKET, SCM_RIGHTS, pack("i", fd))]
-
-        conn.sendmsg([length_header + r_msg], fd_data)
+        if isinstance(operation, Invoke) and not op_result.err:
+            invocation_answer_msg = _SocketMessageBroker.get_message(conn)
+            if not invocation_answer_msg.err:
+                operation.update_file(invocation_answer_msg)
 
         conn.close()
 
@@ -68,66 +88,25 @@ class Daemon:
 
 
 class Client:
-    MAX_MESSAGE_SIZE = 1024
-
-    @staticmethod
-    def _open_file(fd: int, mode: str) -> str:
-        mode_args = ["-R"] if mode == Grants.READ.value else []
-        cmd = ["vim", f"/proc/{getpid()}/fd/{fd}"]
-        cmd.extend(mode_args)
-        try:
-            run(cmd)
-        except Exception as err:
-            return repr(err)
-
-        return ""
-
-    @staticmethod
-    def _get_answer(length_header_size: int,
-                    conn: socket) -> tuple[Message, int | None]:
-        r_msg_length_bytes = b""
-        a_size_expected = CMSG_LEN(calcsize("i"))
-        failed_read = False
-        while len(r_msg_length_bytes) < length_header_size:
-            r_size_expected = length_header_size - len(r_msg_length_bytes)
-            (raw_r_msg_length, anc_msg, _, _) = conn.recvmsg(r_size_expected,
-                                                             a_size_expected)
-            if not raw_r_msg_length:
-                failed_read = True
-
-            r_msg_length_bytes += raw_r_msg_length
-
-        if failed_read:
-            return \
-                Message(payload=None,
-                        err="Failed to get operation result from daemon"), None
-
-        r_msg_length = unpack("!I", r_msg_length_bytes)[0]
-        r_msg = Message.from_bytes(conn.recv(r_msg_length))
-
-        fd = None
-        for cmsg_level, cmsg_type, cmsg_data in anc_msg:
-            if cmsg_level == SOL_SOCKET and cmsg_type == SCM_RIGHTS:
-                fd = unpack("i", cmsg_data)[0]
-
-        return r_msg, fd
-
     @classmethod
     def _call(cls, operation: BaseOp) -> Message:
         with socket(AF_UNIX, SOCK_STREAM) as conn:
             conn.connect(Daemon.SOCK_ADDRESS)
-            conn.sendall(bytes(Message(operation, "")))
+            _SocketMessageBroker.send_message(conn, Message(operation, ""))
 
-            (answer, fd) = cls._get_answer(Daemon.LENGTH_HEADER_SIZE, conn)
+            daemon_msg = _SocketMessageBroker.get_message(conn)
 
-            err = answer.err
-            if fd:
-                err = cls._open_file(fd, answer.payload)
+            op_result = daemon_msg
+            if isinstance(operation, Invoke) and not op_result.err:
+                prompt_result = \
+                    operation.prompt_user_with_file_editor(daemon_msg)
 
-            return Message(
-                payload=answer.get_exposable_payload(),
-                err=err
-            )
+                _SocketMessageBroker.send_message(conn, prompt_result)
+
+                op_result = prompt_result
+
+            return Message(payload=op_result.get_exposable_payload(),
+                           err=op_result.err)
 
     @classmethod
     def call_daemon(cls, operation: BaseOp) -> Message:
