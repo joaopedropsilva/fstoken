@@ -5,7 +5,7 @@ from crypto import NaclBinder
 
 class Keystore:
     STORE_FILENAME = "keystore.db"
-    _KEYSTORE_PATH = Path("/run/fstokend", STORE_FILENAME)
+    _KEYSTORE_PATH = Path("/opt/fstoken", STORE_FILENAME)
     _ENTRY_DATA_SEP = "\t"
 
     @staticmethod
