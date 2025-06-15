@@ -3,11 +3,11 @@ from pathlib import Path
 from os import remove
 from subprocess import run
 
-from src.token import Token, Grants
-from src.file import File
-from src.helpers import Message
-from src.fskeys import Fskeys
-from src.keystore import Keystore
+from token import Token, Grants
+from file import File
+from helpers import Message
+from fskeys import Fskeys
+from keystore import Keystore
 
 
 class BaseOp:

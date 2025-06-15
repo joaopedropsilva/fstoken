@@ -2,7 +2,7 @@ from base64 import b64encode, b64decode
 from pickle import dumps, loads
 from enum import Enum
 
-from src.nacl import NaclBinder
+from crypto import NaclBinder
 
 
 class Grants(Enum):

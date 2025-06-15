@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from src.nacl import NaclBinder
+from crypto import NaclBinder
 
 
 class Keystore:

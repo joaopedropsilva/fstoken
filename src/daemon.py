@@ -4,8 +4,8 @@ from socket import socket, AF_UNIX, SOCK_STREAM
 from struct import pack, unpack
 from threading import Thread
 
-from src.operation import BaseOp, Invoke
-from src.helpers import Message
+from operation import BaseOp, Invoke
+from helpers import Message
 
 
 class _SocketMessageBroker:

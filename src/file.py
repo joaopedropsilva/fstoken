@@ -2,7 +2,7 @@ from pathlib import Path
 from subprocess import run, CalledProcessError
 from functools import partial
 
-from src.nacl import NaclBinder
+from crypto import NaclBinder
 
 
 class  File:

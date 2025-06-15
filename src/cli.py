@@ -1,8 +1,8 @@
 from argparse import ArgumentParser, Namespace
 
-from src.daemon import Client
-from src.operation import OperationRegistry
-from src.helpers import log, log_err
+from daemon import Client
+from operation import OperationRegistry
+from helpers import log, log_err
 
 
 def handle_call(args: Namespace) -> None:
