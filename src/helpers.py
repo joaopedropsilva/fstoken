@@ -2,6 +2,8 @@ from sys import stderr
 from typing import NewType
 from pickle import loads, dumps
 
+from crypto import NaclBinder
+
 
 def log(message: str) -> None:
     if not message:
@@ -13,6 +15,14 @@ def log_err(message: str) -> None:
     if not message:
         return
     print(message, file=stderr)
+
+
+def keygen() -> str:
+    return NaclBinder.secretbox_keygen().decode("utf-8")
+
+
+def remove_whitespace_newline(seq: str) -> str:
+    return seq.strip().split("\n")[0]
 
 
 class Message:

@@ -3,6 +3,7 @@ from pickle import dumps, loads
 from enum import Enum
 
 from crypto import NaclBinder
+from helpers import remove_whitespace_newline
 
 
 class Grants(Enum):
@@ -48,18 +49,16 @@ class Token:
     _raw_payload_fields = [
         ("filekey", str),
         ("grant", str),
-        ("subject", str),
         ("proof", list)
     ]
     _processed_payload_fields = [
         ("file_designator", str),
-        ("subject", str),
         ("proof", list)
     ]
 
     @staticmethod
     def _get_file_designator_hash(filekey: str, grant: str) -> str:
-        key = filekey.split("\n")[0]  # prevents malformed keystrings
+        key = remove_whitespace_newline(filekey)
         designator = f"{key}.{grant}"
 
         return \
@@ -114,9 +113,7 @@ class Token:
 
         processed_payload = {
             "file_designator": \
-                cls._get_file_designator_hash(raw_payload["filekey"],
-                                              repr(grant)),
-            "subject": raw_payload["subject"],
+                cls._get_file_designator_hash(raw_payload["filekey"], repr(grant)),
             "proof": raw_payload["proof"]
         }
 

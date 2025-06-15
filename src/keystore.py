@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from crypto import NaclBinder
+from helpers import keygen
 
 
 class Keystore:
@@ -11,10 +12,6 @@ class Keystore:
     @staticmethod
     def _get_filestring(file: str) -> str:
         return str(Path(file).resolve())
-
-    @staticmethod
-    def _create_key() -> str:
-        return NaclBinder.secretbox_keygen().decode("utf-8")
 
     @classmethod
     def _create_entry_repr(cls, entry: tuple[str, str, str]) -> str:
@@ -79,8 +76,7 @@ class Keystore:
         (_, current_key) = cls.search_entry_state(file)
         entry_exists = current_key != ""
 
-        filekey = cls._create_key() \
-                if rotate_key or not entry_exists else current_key
+        filekey = keygen() if rotate_key or not entry_exists else current_key
         new_entry = (cls._get_filestring(file), 
                      "1" if encrypt else "0",
                      filekey)

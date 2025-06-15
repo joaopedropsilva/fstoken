@@ -5,8 +5,7 @@ from subprocess import run
 
 from token import Token, Grants
 from file import File
-from helpers import Message
-from fskeys import Fskeys
+from helpers import Message, remove_whitespace_newline
 from keystore import Keystore
 
 
@@ -21,7 +20,7 @@ class BaseOp:
     def run_priviledged(self) -> Message:
         if not self._requester_has_access_to_file:
             return Message(
-                payload="",
+                payload=None,
                 err=f"Operation not allowed for user in {self._args.file}"
             )
 
@@ -43,7 +42,7 @@ class Delete(BaseOp):
         (was_encrypted, prevkey) = Keystore.search_entry_state(self._args.file)
         if not prevkey:
             return Message(
-                payload="",
+                payload=None,
                 err=f"File not found in {Keystore.STORE_FILENAME}"
             )
 
@@ -65,7 +64,8 @@ class Invoke(BaseOp):
             return Message(payload=default_payload,
                            err="Failed to recover file information")
 
-        tmp_filename = f"/tmp/temp_{filename}"
+        file_id = filename.split("/")[-1]
+        tmp_filename = f"/tmp/temp_{file_id}"
         with open(tmp_filename, "w") as f:
             f.write(file_content)
 
@@ -195,15 +195,14 @@ class Delegate(Add):
         if add_op_result.err:
             return add_op_result
 
-        (private, _) = Fskeys.get_keys()
         try:
-            token = Token.encode(private,
+            seed = remove_whitespace_newline(self._args.key)
+            token = Token.encode(seed,
                                  raw_payload={"filekey": add_op_result.payload,
                                               "grant": self._args.grant,
-                                              "subject": self._args.subject,
                                               "proof": [self._args.token]})
         except (AssertionError, KeyError) as err:
-            return Message(payload="", err=err)
+            return Message(payload=None, err=err)
 
         return Message(payload=token, err="", hide_payload=False)
 
@@ -214,8 +213,8 @@ class OperationRegistry:
         if args.delete:
             return Delete(args)
 
-        is_delegation = args.grant and args.subject
-        if args.grant and args.subject:
+        is_delegation = args.grant and args.key
+        if is_delegation:
             return Delegate(args)
 
         if args.token and not is_delegation:

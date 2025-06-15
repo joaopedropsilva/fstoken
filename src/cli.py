@@ -3,7 +3,7 @@ from pathlib import Path
 
 from daemon import Client
 from operation import OperationRegistry, Delete
-from helpers import log, log_err
+from helpers import log, log_err, keygen
 
 
 def _try_resolve_file(file: str) -> str:
@@ -14,9 +14,16 @@ def _try_resolve_file(file: str) -> str:
 
 
 def handle_call(args: Namespace) -> None:
-    file = _try_resolve_file(args.file)
+    if args.keygen:
+        print(keygen())
+        exit(0)
+
+    if not args.file:
+        log_err("File argument is required for this action")
+        exit(1)
+    file = _try_resolve_file(args.file[0])
     if not file:
-        log_err(f"File {args.file} could not be found!")
+        log_err(f"File {args.file} could not be found")
         exit(1)
     args.file = file
 
@@ -44,12 +51,13 @@ if __name__ == "__main__":
                             description="A command line tool that enables " \
                             "file access control using a semi capabilities " \
                             "model and encryption.")
-    parser.add_argument("file")
+    parser.add_argument("--file", "-f", nargs=1, default="")
+    parser.add_argument("--keygen", action="store_true")
     parser.add_argument("--encrypt", "-e", action="store_true")
     parser.add_argument("--rotate", "-r", action="store_true")
     parser.add_argument("--delete", "-d", action="store_true")
     parser.add_argument("--grant", "-g", default="")
-    parser.add_argument("--subject", "-s", default="")
+    parser.add_argument("--key", "-k", default="")
     parser.add_argument("--token", "-t", default="")
     args = parser.parse_args()
 

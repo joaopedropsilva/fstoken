@@ -9,14 +9,6 @@ from nacl.utils import random
 
 class NaclBinder:
     @staticmethod
-    def x25519_keygen() -> tuple[bytes, bytes]:
-        key = PrivateKey.generate()
-        private = bytes(key)
-        public = bytes(key.public_key)
-
-        return Base64Encoder.encode(private), Base64Encoder.encode(public)
-
-    @staticmethod
     def sign_message(seed: bytes, message: bytes) -> tuple[bytes, bytes, bytes]:
         signing_key = SigningKey(seed)
         verify_key = signing_key.verify_key
