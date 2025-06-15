@@ -1,11 +1,25 @@
 from argparse import ArgumentParser, Namespace
+from pathlib import Path
 
 from daemon import Client
 from operation import OperationRegistry
 from helpers import log, log_err
 
 
+def _try_resolve_file(file: str) -> str:
+    try:
+        return str(Path(file).resolve(strict=True))
+    except OSError:
+        return ""
+
+
 def handle_call(args: Namespace) -> None:
+    file = _try_resolve_file(args.file)
+    if not file:
+        log_err("File {args.file} could not be found!")
+        exit(1)
+    args.file = file
+
     op = OperationRegistry.get_operation_by_args(args)
 
     op_unpriv_err = op.run_unpriviledged()
