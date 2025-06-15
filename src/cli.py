@@ -2,7 +2,7 @@ from argparse import ArgumentParser, Namespace
 from pathlib import Path
 
 from daemon import Client
-from operation import OperationRegistry
+from operation import OperationRegistry, Delete
 from helpers import log, log_err
 
 
@@ -16,11 +16,20 @@ def _try_resolve_file(file: str) -> str:
 def handle_call(args: Namespace) -> None:
     file = _try_resolve_file(args.file)
     if not file:
-        log_err("File {args.file} could not be found!")
+        log_err(f"File {args.file} could not be found!")
         exit(1)
     args.file = file
 
     op = OperationRegistry.get_operation_by_args(args)
+
+    if isinstance(op, Delete):
+        call_result = Client.call_daemon(op)
+        log_err(call_result.err)
+        log(call_result.payload)
+
+        op_unpriv_err = op.run_unpriviledged()
+        log_err(op_unpriv_err)
+        exit(0)
 
     op_unpriv_err = op.run_unpriviledged()
     log_err(op_unpriv_err)

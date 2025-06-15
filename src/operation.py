@@ -37,15 +37,9 @@ class Delete(BaseOp):
         if revocation_err:
             return revocation_err
 
-        self._requester_has_access_to_file = True
-
         return ""
 
     def run_priviledged(self) -> Message:
-        base_op_result = super().run_priviledged()
-        if base_op_result.err:
-            return base_op_result
-
         (was_encrypted, prevkey) = Keystore.search_entry_state(self._args.file)
         if not prevkey:
             return Message(
