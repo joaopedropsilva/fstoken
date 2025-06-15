@@ -1,4 +1,6 @@
 from argparse import Namespace
+from traceback import format_exception
+from functools import reduce
 from os import path, remove, chmod
 from socket import socket, AF_UNIX, SOCK_STREAM
 from struct import pack, unpack
@@ -49,17 +51,28 @@ class Daemon:
     LENGTH_HEADER_SIZE = 4
 
     @staticmethod
-    def _answer_request(conn: socket) -> None:
-        client_msg = _SocketMessageBroker.get_message(conn)
-        operation: BaseOp = client_msg.payload
+    def _get_exception_str(err: Exception) -> str:
+        return reduce(lambda exc_str, curr_str: exc_str + curr_str,
+                      format_exception(err))
 
-        op_result = operation.run_priviledged()
-        _SocketMessageBroker.send_message(conn, op_result)
+    @staticmethod
+    def _answer_request(cls: "Daemon", conn: socket) -> None:
+        try:
+            client_msg = _SocketMessageBroker.get_message(conn)
+            operation: BaseOp = client_msg.payload
 
-        if isinstance(operation, Invoke) and not op_result.err:
-            invocation_answer_msg = _SocketMessageBroker.get_message(conn)
-            if not invocation_answer_msg.err:
-                operation.update_file(invocation_answer_msg)
+            op_result = operation.run_priviledged()
+            _SocketMessageBroker.send_message(conn, op_result)
+
+            if isinstance(operation, Invoke) and not op_result.err:
+                invocation_answer_msg = _SocketMessageBroker.get_message(conn)
+                if not invocation_answer_msg.err:
+                    operation.update_file(invocation_answer_msg)
+        except Exception as err:
+            exc_string = cls._get_exception_str(err)
+            err_msg = Message(payload=None,
+                              err=f"Unexpected runtime error:\n{exc_string}")
+            _SocketMessageBroker.send_message(conn, err_msg)
 
         conn.close()
 
@@ -79,7 +92,7 @@ class Daemon:
                     (conn, _) = daemon_socket.accept()
 
 
-                    t = Thread(target=cls._answer_request, args=(conn,))
+                    t = Thread(target=cls._answer_request, args=(cls, conn,))
                     t.start()
                     conn_threads.append(t)
             except KeyboardInterrupt:
