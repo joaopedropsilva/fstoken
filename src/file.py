@@ -42,9 +42,10 @@ class  File:
     @classmethod
     def grant_fstoken_access(cls, file: str) -> str:
         file = str(Path(file).resolve())
+        parent_dir = str(Path(file).parent.resolve())
         try:
-            run(["setfacl", "-m", f"u:{cls._FSTOKEN_USER}:rw-", file],
-                check=True)
+            run(["setfacl", "-m", f"u:{cls._FSTOKEN_USER}:rw-", file], check=True)
+            run(["setfacl", "-m", f"u:{cls._FSTOKEN_USER}:wx", parent_dir], check=True)
         except CalledProcessError:
             return f"Failed to grant fstoken user access to file: {file}"
 
@@ -52,10 +53,11 @@ class  File:
 
     @classmethod
     def revoke_fstoken_access(cls, file: str) -> str:
-        filepath = Path(file)
+        file = str(Path(file).resolve())
+        parent_dir = str(Path(file).parent.resolve())
         try:
-            run(["setfacl", "-x", f"u:{cls._FSTOKEN_USER}", file],
-                check=True)
+            run(["setfacl", "-x", f"u:{cls._FSTOKEN_USER}", file], check=True)
+            run(["setfacl", "-x", f"u:{cls._FSTOKEN_USER}", parent_dir], check=True)
         except CalledProcessError:
             return f"Failed to revoke fstoken user access to file: {file}"
 
